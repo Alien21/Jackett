@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using AngleSharp.Html.Parser;
 using Jackett.Common.Models;
 using Jackett.Common.Models.IndexerConfig.Bespoke;
 using Jackett.Common.Services.Interfaces;
@@ -18,8 +19,17 @@ using NLog;
 namespace Jackett.Common.Indexers
 {
     [ExcludeFromCodeCoverage]
-    public class TVStore : BaseWebIndexer
+    public class TVStore : IndexerBase
     {
+        public override string Id => "tvstore";
+        public override string Name => "TV Store";
+        public override string Description => "TV Store is a HUNGARIAN Private Torrent Tracker for TV";
+        public override string SiteLink { get; protected set; } = "https://tvstore.me/";
+        public override string Language => "hu-HU";
+        public override string Type => "private";
+
+        public override TorznabCapabilities TorznabCaps => SetCapabilities();
+
         private readonly Dictionary<int, long> _imdbLookup = new Dictionary<int, long>(); // _imdbLookup[internalId] = imdbId
 
         private readonly Dictionary<long, int>
@@ -31,37 +41,35 @@ namespace Jackett.Common.Indexers
         private readonly Regex _seriesInfoSearchRegex = new Regex(
             @"S(?<season>\d{1,3})(?:E(?<episode>\d{1,3}))?$", RegexOptions.IgnoreCase);
 
-        public TVStore(IIndexerConfigurationService configService, WebClient wc, Logger l, IProtectionService ps,
-            ICacheService cs) :
-            base(id: "tvstore",
-                 name: "TV Store",
-                 description: "TV Store is a HUNGARIAN Private Torrent Tracker for TV",
-                 link: "https://tvstore.me/",
-                 caps: new TorznabCapabilities
-                 {
-                     TvSearchParams = new List<TvSearchParam>
-                     {
-                         TvSearchParam.Q, TvSearchParam.Season, TvSearchParam.Ep, TvSearchParam.ImdbId
-                     },
-                     MovieSearchParams = new List<MovieSearchParam>
-                     {
-                         MovieSearchParam.Q, MovieSearchParam.ImdbId
-                     }
-                 },
-                 configService: configService,
+        public TVStore(IIndexerConfigurationService configService, WebClient wc, Logger l, IProtectionService ps, ICacheService cs) :
+            base(configService: configService,
                  client: wc,
                  logger: l,
                  p: ps,
                  cacheService: cs,
                  configData: new ConfigurationDataTVstore())
         {
-            Encoding = Encoding.UTF8;
-            Language = "hu-HU";
-            Type = "private";
+        }
 
-            AddCategoryMapping(1, TorznabCatType.TV);
-            AddCategoryMapping(2, TorznabCatType.TVHD);
-            AddCategoryMapping(3, TorznabCatType.TVSD);
+        private TorznabCapabilities SetCapabilities()
+        {
+            var caps = new TorznabCapabilities
+            {
+                TvSearchParams = new List<TvSearchParam>
+                {
+                    TvSearchParam.Q, TvSearchParam.Season, TvSearchParam.Ep, TvSearchParam.ImdbId
+                },
+                MovieSearchParams = new List<MovieSearchParam>
+                {
+                    MovieSearchParam.Q, MovieSearchParam.ImdbId
+                }
+            };
+
+            caps.Categories.AddCategoryMapping(1, TorznabCatType.TV);
+            caps.Categories.AddCategoryMapping(2, TorznabCatType.TVHD);
+            caps.Categories.AddCategoryMapping(3, TorznabCatType.TVSD);
+
+            return caps;
         }
 
         private string LoginUrl => SiteLink + "takelogin.php";
@@ -141,8 +149,8 @@ namespace Jackett.Common.Indexers
             try
             {
                 /* Content Looks like this
-                 * 2\15\2\1\1727\207244\1x08 \[WebDL-720p - Eng - AJP69]\gb\2018-03-09 08:11:53\akció, kaland, sci-fi \0\0\1\191170047\1\0\Anonymous\50\0\0\\0\4\0\174\0\
-                 * 1\ 0\0\1\1727\207243\1x08 \[WebDL-1080p - Eng - AJP69]\gb\2018-03-09 08:11:49\akció, kaland, sci-fi \0\0\1\305729738\1\0\Anonymous\50\0\0\\0\8\0\102\0\0\0\0\1\\\
+                 * 2\15\2\1\1727\207244\1x08 \[WebDL-720p - Eng - AJP69]\gb\2018-03-09 08:11:53\<a href='#m=4'><span class='mufaj'>dráma</span></a>, <a href='#m=13'><span class='mufaj'>romantika</span></a>, <a href='#m=20'><span class='mufaj'>orvosi</span></a>&nbsp;\0\0\1\191170047\1\0\Anonymous\50\0\0\\0\4\0\174\0\
+                 * 1\ 0\0\1\1727\207243\1x08 \[WebDL-1080p - Eng - AJP69]\gb\2018-03-09 08:11:49\<a href='#m=4'><span class='mufaj'>dráma</span></a>, <a href='#m=13'><span class='mufaj'>romantika</span></a>, <a href='#m=20'><span class='mufaj'>orvosi</span></a>&nbsp;\0\0\1\305729738\1\0\Anonymous\50\0\0\\0\8\0\102\0\0\0\0\1\\\
                  * First 3 items per page are total results, results per page, and results this page
                  * There is also a tail of ~4 items after the results for some reason. Looks like \1\\\
                  */
@@ -159,6 +167,13 @@ namespace Jackett.Common.Indexers
                 {
                     var torrentId = row[(int)TorrentParts.TorrentId];
                     var downloadLink = new Uri(DownloadUrl + "?id=" + torrentId);
+                    // the genre field is a html string, and we just want the text
+                    var parser = new HtmlParser();
+                    using var dom = parser.ParseDocument(row[(int)TorrentParts.Genre]);
+                    var genres = dom.QuerySelector("*").TextContent.Replace("\xA0", "");
+                    var description = "";
+                    if (!string.IsNullOrWhiteSpace(genres))
+                        description = genres;
                     var imdbId = _imdbLookup.TryGetValue(int.Parse(row[(int)TorrentParts.InternalId]), out var imdb)
                         ? (long?)imdb
                         : null;
@@ -201,12 +216,16 @@ namespace Jackett.Common.Indexers
                         Seeders = seeders,
                         Peers = leechers + seeders,
                         Grabs = grabs,
+                        Description = description,
                         MinimumRatio = 1,
                         MinimumSeedTime = 172800, // 48 hours
-                        DownloadVolumeFactor = 1,
+                        DownloadVolumeFactor = 0,
                         UploadVolumeFactor = UploadFactorCalculator(publishDate, isSeasonPack),
                         Imdb = imdbId
                     };
+                    if (release.Genres == null)
+                        release.Genres = new List<string>();
+                    release.Genres = release.Genres.Union(genres.Split(',')).ToList();
                     releases.Add(release);
                 }
             }
@@ -325,6 +344,7 @@ namespace Jackett.Common.Indexers
             TorrentId = 2,
             EpisodeInfo = 3,
             PublishDate = 6,
+            Genre = 7,
             Files = 10,
             SizeBytes = 11,
             Seeders = 20,

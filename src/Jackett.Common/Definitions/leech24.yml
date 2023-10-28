@@ -5,8 +5,6 @@ description: "leech24 is a Private Torrent Tracker for MOVIES / TV / GENERAL"
 language: en-US
 type: private
 encoding: UTF-8
-certificates:
-  - 15a5285012463f22155b077ddfbad9feb9b4b8ee # issued to DNS Name=vds50211.inrr.ru
 links:
   - https://leech24.net/
 
@@ -21,6 +19,7 @@ caps:
     - {id: 45, cat: Console/NDS, desc: "Games: DS"}
     - {id: 16, cat: Console/Other, desc: "Games: Dreamcast"}
     - {id: 46, cat: Console/Other, desc: "Games: GameCube"}
+    - {id: 49, cat: Console/NDS, desc: "Games: Nintendo"}
     - {id: 17, cat: Console/Other, desc: "Games: Other"}
     - {id: 10, cat: PC/Games, desc: "Games: PC"}
     - {id: 15, cat: Console/PSP, desc: "Games: PS"}
@@ -68,7 +67,7 @@ settings:
   - name: info
     type: info
     label: How to get the Cookie
-    default: "<ol><li>Login to this tracker with your browser<li>Open the <b>DevTools</b> panel by pressing <b>F12</b><li>Select the <b>Network</b> tab<li>Click on the <b>Doc</b> button (Chrome Browser) or <b>HTML</b> button (FireFox)<li>Refresh the page by pressing <b>F5</b><li>Click on the first row entry<li>Select the <b>Headers</b> tab on the Right panel<li>Find <b>'cookie:'</b> in the <b>Request Headers</b> section<li><b>Select</b> and <b>Copy</b> the whole cookie string <i>(everything after 'cookie: ')</i> and <b>Paste</b> here.</ol>"
+    default: "<ol><li>Login to this tracker with your browser</li><li>Open the <b>DevTools</b> panel by pressing <b>F12</b></li><li>Select the <b>Network</b> tab</li><li>Click on the <b>Doc</b> button (Chrome Browser) or <b>HTML</b> button (FireFox)</li><li>Refresh the page by pressing <b>F5</b></li><li>Click on the first row entry</li><li>Select the <b>Headers</b> tab on the Right panel</li><li>Find <b>'cookie:'</b> in the <b>Request Headers</b> section</li><li><b>Select</b> and <b>Copy</b> the whole cookie string <i>(everything after 'cookie: ')</i> and <b>Paste</b> here.</li></ol>"
   - name: freeleech
     type: checkbox
     label: Search freeleech only
@@ -120,7 +119,7 @@ search:
 # but adding + to words causes 0 results, so we will add an andmatch since the default seems to be a keywords OR search.
 #  keywordsfilters:
 #    - name: re_replace
-#      args: ["(\\w+)", " +$1"] # prepend + to each word
+#      args: ["(\\w+)", "+$1"] # prepend + to each word
 
   rows:
     selector: table.ttable_headinner tr.t-row:has(a[href^="download.php?id="])

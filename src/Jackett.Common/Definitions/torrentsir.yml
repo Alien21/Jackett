@@ -7,26 +7,40 @@ type: public
 encoding: UTF-8
 followredirect: true
 links:
-  - https://torrentsir58.com/
+  - https://torrentsir122.com/
 legacylinks:
-  - https://torrentsir46.com/
-  - https://torrentsir47.com/
-  - https://torrentsir48.com/
-  - https://torrentsir49.com/
-  - https://torrentsir50.com/
-  - https://torrentsir51.com/
-  - https://torrentsir52.com/
-  - http://torrentsir52.com/
-  - https://torrentsir53.com/
-  - http://torrentsir53.com/
-  - https://torrentsir54.com/
-  - http://torrentsir54.com/
-  - https://torrentsir55.com/
-  - http://torrentsir55.com/
-  - http://torrentsir56.com/
-  - https://torrentsir56.com/
-  - https://torrentsir57.com/
-  - http://torrentsir58.com/
+  - http://torrentsir106.com/
+  - https://torrentsir106.com/
+  - http://torrentsir108.com/
+  - https://torrentsir108.com/
+  - http://torrentsir109.com/
+  - https://torrentsir109.com/
+  - http://torrentsir110.com/
+  - https://torrentsir110.com/
+  - http://torrentsir111.com/
+  - https://torrentsir111.com/
+  - http://torrentsir112.com/
+  - https://torrentsir112.com/
+  - http://torrentsir113.com/
+  - https://torrentsir113.com/
+  - http://torrentsir114.com/
+  - https://torrentsir114.com/
+  - http://torrentsir115.com/
+  - https://torrentsir115.com/
+  - http://torrentsir116.com
+  - https://torrentsir116.com/
+  - http://torrentsir117.com/
+  - https://torrentsir117.com/
+  - http://torrentsir118.com/
+  - https://torrentsir118.com/
+  - http://torrentsir119.com/
+  - https://torrentsir119.com/
+  - http://torrentsir120.com/
+  - https://torrentsir120.com/
+  - http://torrentsir121.com/
+  - https://torrentsir121.com/
+  - http://torrentsir122.com/
+
 caps:
   categorymappings:
     - {id: "gallery", cat: XXX, desc: "+19 (Adult)"}
@@ -44,7 +58,7 @@ caps:
 
   modes:
     search: [q]
-    tv-search: [q]
+    tv-search: [q, season, ep]
     movie-search: [q]
     music-search: [q]
     book-search: [q]

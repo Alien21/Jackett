@@ -10,8 +10,6 @@ links:
 legacylinks:
   - https://xxxtor.org/ # redirects to .com
   - https://xxxtor.info/ # redirects to .com
-certificates:
-  - 278bf7803b18da82c113ea307e2ac0b4242a8bbe # expired 20 Feb 2022
 
 caps:
   categorymappings:
@@ -78,7 +76,7 @@ search:
         - name: append
           args: " +03:00" # MSK
         - name: dateparse
-          args: "02 Jan 06 -07:00"
+          args: "dd MMM yy zzz"
     size:
       selector: td:nth-of-type(3)
     seeders:

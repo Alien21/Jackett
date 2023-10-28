@@ -5,12 +5,21 @@ description: "Badass Torrents is a Public torrent site for MOVIES / TV / GENERAL
 language: en-US
 type: public
 encoding: UTF-8
+requestDelay: 5
 links:
   - https://badasstorrents.com/
-  - https://badasstorrents.nocensor.sbs/
+  - https://badasstorrents.mrunblock.bond/
+  - https://badasstorrents.nocensor.cloud/
 legacylinks:
   - https://badasstorrents.nocensor.work/
   - https://badasstorrents.nocensor.biz/
+  - https://badasstorrents.nocensor.sbs/
+  - https://badasstorrents.nocensor.world/
+  - https://badasstorrents.nocensor.lol/
+  - https://badasstorrents.nocensor.art/
+  - https://badasstorrents.mrunblock.guru/
+  - https://badasstorrents.mrunblock.life/
+  - https://badasstorrents.nocensor.click/
 
 caps:
   categories:
@@ -77,8 +86,6 @@ search:
   paths:
     - path: "torrents/{{ if .Keywords }}search/{{ .Keywords }}/{{ else }}{{ end }}{{ .Config.sort }}/{{ .Config.type }}"
     - path: "torrents/{{ if .Keywords }}search/{{ .Keywords }}/{{ else }}{{ end }}26/{{ .Config.sort }}/{{ .Config.type }}"
-    - path: "torrents/{{ if .Keywords }}search/{{ .Keywords }}/{{ else }}{{ end }}51/{{ .Config.sort }}/{{ .Config.type }}"
-    - path: "torrents/{{ if .Keywords }}search/{{ .Keywords }}/{{ else }}{{ end }}76/{{ .Config.sort }}/{{ .Config.type }}"
 
   rows:
     selector: table.table-hover > tbody > tr:has(a[href*="/torrent/"])

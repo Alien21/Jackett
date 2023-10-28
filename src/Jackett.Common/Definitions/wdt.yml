@@ -125,7 +125,7 @@ search:
 
   keywordsfilters:
     - name: re_replace
-      args: ["(\\w+)", " +$1"] # prepend + to each word
+      args: ["(\\w+)", "+$1"] # prepend + to each word
 
   rows:
     selector: table.table-bordered tr:has(a[href^="download.php?torrent="])
@@ -155,11 +155,10 @@ search:
       selector: td:nth-child(5)
     date:
       selector: td:nth-child(7)
+      # auto adjusted by site account profile
       filters:
-        - name: append
-          args: " +00:00" # auto adjusted by site account profile
         - name: dateparse
-          args: "Jan 2 2006 03:04 PM -07:00"
+          args: "MMM d yyyy hh:mm tt"
     size:
       selector: td:nth-child(8)
     grabs:
@@ -178,6 +177,6 @@ search:
     minimumratio:
       text: 1.0
     minimumseedtime:
-      # 2 days (as seconds = 2 x 24 x 60 x 60)
-      text: 172800
+      # 12 hours (as seconds = 12 x 60 x 60)
+      text: 43200
 # U-232 V5

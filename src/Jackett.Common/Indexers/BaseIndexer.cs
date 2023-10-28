@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Jackett.Common.Exceptions;
+using Jackett.Common.Extensions;
 using Jackett.Common.Models;
 using Jackett.Common.Models.IndexerConfig;
 using Jackett.Common.Services.Interfaces;
@@ -18,19 +20,21 @@ namespace Jackett.Common.Indexers
 {
     public abstract class BaseIndexer : IIndexer
     {
-        public string Id { get; protected set; }
-        public string SiteLink { get; protected set; }
-        public virtual string[] LegacySiteLinks { get; protected set; }
-        public string DefaultSiteLink { get; protected set; }
-        public virtual string[] AlternativeSiteLinks { get; protected set; } = { };
-        public string DisplayDescription { get; protected set; }
-        public string DisplayName { get; protected set; }
-        public string Language { get; protected set; }
-        public string Type { get; protected set; }
+        public virtual string Id { get; protected set; }
+        public virtual string Name { get; protected set; }
+        public virtual string Description { get; protected set; }
 
+        public virtual string SiteLink { get; protected set; }
+        public string DefaultSiteLink { get; protected set; }
+        public virtual string[] AlternativeSiteLinks { get; protected set; } = Array.Empty<string>();
+        public virtual string[] LegacySiteLinks { get; protected set; } = Array.Empty<string>();
 
         [JsonConverter(typeof(EncodingJsonConverter))]
-        public Encoding Encoding { get; protected set; }
+        public virtual Encoding Encoding { get; protected set; }
+        public virtual string Language { get; protected set; } = "en-US";
+        public virtual string Type { get; protected set; }
+
+        public virtual bool SupportsPagination => false;
 
         public virtual bool IsConfigured { get; protected set; }
         public virtual string[] Tags { get; protected set; }
@@ -75,23 +79,18 @@ namespace Jackett.Common.Indexers
         public abstract TorznabCapabilities TorznabCaps { get; protected set; }
 
         // standard constructor used by most indexers
-        public BaseIndexer(string link, string id, string name, string description,
-                           IIndexerConfigurationService configService, Logger logger, ConfigurationData configData,
-                           IProtectionService p, ICacheService cs)
+        public BaseIndexer(IIndexerConfigurationService configService, Logger logger, ConfigurationData configData, IProtectionService p, ICacheService cs)
         {
             this.logger = logger;
             configurationService = configService;
             protectionService = p;
             cacheService = cs;
 
-            if (!link.EndsWith("/", StringComparison.Ordinal))
+            if (SiteLink.IsNotNullOrWhiteSpace() && !SiteLink.EndsWith("/", StringComparison.Ordinal))
                 throw new Exception("Site link must end with a slash.");
 
-            Id = id;
-            DisplayName = name;
-            DisplayDescription = description;
-            SiteLink = link;
-            DefaultSiteLink = link;
+            DefaultSiteLink = SiteLink;
+
             this.configData = configData;
             if (configData != null)
                 LoadValuesFromJson(null);
@@ -194,7 +193,7 @@ namespace Jackett.Common.Indexers
 
                 // fix publish date
                 // some trackers do not keep their clocks up to date and can be ~20 minutes out!
-                if (r.PublishDate > DateTime.Now)
+                if (!EnvironmentUtil.IsDebug && r.PublishDate > DateTime.Now)
                     r.PublishDate = DateTime.Now;
 
                 // generate magnet link from info hash (not allowed for private sites)
@@ -251,7 +250,9 @@ namespace Jackett.Common.Indexers
                 return true;
             if (caps.MovieSearchImdbAvailable && query.IsImdbQuery)
                 return true;
-            if (caps.MovieSearchTmdbAvailable && query.IsTmdbQuery)
+            if (caps.MovieSearchTmdbAvailable && query.IsTmdbQuery && query.IsMovieSearch)
+                return true;
+            if (caps.TvSearchTmdbAvailable && query.IsTmdbQuery && query.IsTVSearch)
                 return true;
 
             return false;
@@ -266,13 +267,13 @@ namespace Jackett.Common.Indexers
                 if (supportedCats.Length == 0)
                 {
                     if (!isMetaIndexer)
-                        logger.Error($"All categories provided are unsupported in {DisplayName}: {string.Join(",", query.Categories)}");
+                        logger.Error($"All categories provided are unsupported in {Name}: {string.Join(",", query.Categories)}");
                     return false;
                 }
                 if (supportedCats.Length != query.Categories.Length && !isMetaIndexer)
                 {
                     var unsupportedCats = query.Categories.Except(supportedCats);
-                    logger.Warn($"Some of the categories provided are unsupported in {DisplayName}: {string.Join(",", unsupportedCats)}");
+                    logger.Warn($"Some of the categories provided are unsupported in {Name}: {string.Join(",", unsupportedCats)}");
                 }
             }
             return true;
@@ -294,7 +295,10 @@ namespace Jackett.Common.Indexers
             var queryCopy = query.Clone();
 
             if (!CanHandleQuery(queryCopy) || !CanHandleCategories(queryCopy, isMetaIndexer))
-                return new IndexerResult(this, new ReleaseInfo[0], false);
+                return new IndexerResult(this, Array.Empty<ReleaseInfo>(), false);
+
+            if (!SupportsPagination && queryCopy.Offset > 0)
+                return new IndexerResult(this, Array.Empty<ReleaseInfo>(), false);
 
             if (queryCopy.Cache)
             {
@@ -313,6 +317,12 @@ namespace Jackett.Common.Indexers
                 expireAt = DateTime.Now.Add(HealthyStatusValidity);
                 return new IndexerResult(this, results, false);
             }
+            catch (TooManyRequestsException ex)
+            {
+                var delay = ex.RetryAfter.TotalSeconds;
+                expireAt = DateTime.Now.AddSeconds(delay);
+                throw new IndexerException(this, ex);
+            }
             catch (Exception ex)
             {
                 var delay = Math.Min(MaxStatusValidity.TotalSeconds, ErrorStatusValidity.TotalSeconds * Math.Pow(2, errorCount++));
@@ -326,21 +336,22 @@ namespace Jackett.Common.Indexers
 
     public abstract class BaseWebIndexer : BaseIndexer, IWebIndexer
     {
-        protected BaseWebIndexer(string link, string id, string name, string description,
-                                 IIndexerConfigurationService configService, WebClient client, Logger logger,
+        protected BaseWebIndexer(IIndexerConfigurationService configService, WebClient client, Logger logger,
                                  ConfigurationData configData, IProtectionService p, ICacheService cacheService,
-                                 TorznabCapabilities caps, string downloadBase = null)
-            : base(link, id, name, description, configService, logger, configData, p, cacheService)
+                                 string downloadBase = null)
+            : base(configService: configService, logger: logger, configData: configData, p: p, cs: cacheService)
         {
             webclient = client;
             downloadUrlBase = downloadBase;
-            TorznabCaps = caps;
         }
 
         // minimal constructor used by e.g. cardigann generic indexer
         protected BaseWebIndexer(IIndexerConfigurationService configService, WebClient client, Logger logger,
             IProtectionService p, ICacheService cacheService)
-            : base("/", "", "", "", configService, logger, null, p, cacheService) => webclient = client;
+            : base(configService: configService, logger: logger, configData: null, p: p, cs: cacheService)
+        {
+            webclient = client;
+        }
 
         protected virtual int DefaultNumberOfRetryAttempts => 2;
 
@@ -394,11 +405,11 @@ namespace Jackett.Common.Indexers
                         {
                             if (exception.Result == null)
                             {
-                                logger.Warn($"Request to {DisplayName} failed with exception '{exception.Exception.Message}'. Retrying in {timeSpan.TotalSeconds}s... (Attempt {attemptNumber} of {NumberOfRetryAttempts}).");
+                                logger.Warn($"Request to {Name} failed with exception '{exception.Exception.Message}'. Retrying in {timeSpan.TotalSeconds}s... (Attempt {attemptNumber} of {NumberOfRetryAttempts}).");
                             }
                             else
                             {
-                                logger.Warn($"Request to {DisplayName} failed with status {exception.Result.Status}. Retrying in {timeSpan.TotalSeconds}s... (Attempt {attemptNumber} of {NumberOfRetryAttempts}).");
+                                logger.Warn($"Request to {Name} failed with status {exception.Result.Status}. Retrying in {timeSpan.TotalSeconds}s... (Attempt {attemptNumber} of {NumberOfRetryAttempts}).");
                             }
                             attemptNumber++;
                         });
@@ -454,6 +465,16 @@ namespace Jackett.Common.Indexers
             {
                 await FollowIfRedirect(response);
             }
+
+            if (response.IsRedirect)
+            {
+                var redirectingTo = new Uri(response.RedirectingTo);
+                if (redirectingTo.Scheme == "magnet")
+                    return Encoding.UTF8.GetBytes(redirectingTo.OriginalString);
+
+                await FollowIfRedirect(response);
+            }
+
             if (response.Status != System.Net.HttpStatusCode.OK && response.Status != System.Net.HttpStatusCode.Continue && response.Status != System.Net.HttpStatusCode.PartialContent)
             {
                 logger.Error("Failed download cookies: " + CookieHeader);
@@ -519,7 +540,7 @@ namespace Jackett.Common.Indexers
             {
                 Url = url,
                 Type = RequestType.POST,
-                Cookies = cookies,
+                Cookies = cookies ?? CookieHeader,
                 Referer = referer,
                 PostData = data,
                 Encoding = Encoding,
@@ -559,19 +580,29 @@ namespace Jackett.Common.Indexers
             }
         }
 
-        protected async Task FollowIfRedirect(WebResult response, string referrer = null, string overrideRedirectUrl = null, string overrideCookies = null, bool accumulateCookies = false)
+        protected async Task FollowIfRedirect(WebResult response, string referrer = null, string overrideRedirectUrl = null, string overrideCookies = null, bool accumulateCookies = false, int maxRedirects = 5)
         {
-            // Follow up  to 5 redirects
-            for (var i = 0; i < 5; i++)
+            for (var i = 0; i < maxRedirects; i++)
             {
                 if (!response.IsRedirect)
+                {
                     break;
+                }
+
+                var redirectingTo = new Uri(response.RedirectingTo);
+                if (redirectingTo.Scheme == "magnet")
+                {
+                    break;
+                }
+
                 await DoFollowIfRedirect(response, referrer, overrideRedirectUrl, overrideCookies, accumulateCookies);
+
                 if (accumulateCookies)
                 {
                     CookieHeader = ResolveCookies((CookieHeader != null && CookieHeader != "" ? CookieHeader + " " : "") + (overrideCookies != null && overrideCookies != "" ? overrideCookies + " " : "") + response.Cookies);
                     overrideCookies = response.Cookies = CookieHeader;
                 }
+
                 if (overrideCookies != null && response.Cookies == null)
                 {
                     response.Cookies = overrideCookies;
@@ -694,7 +725,7 @@ namespace Jackett.Common.Indexers
 
         protected void OnParseError(string results, Exception ex)
         {
-            var fileName = string.Format("Error on {0} for {1}.txt", DateTime.Now.ToString("yyyyMMddHHmmss"), DisplayName);
+            var fileName = string.Format("Error on {0} for {1}.txt", DateTime.Now.ToString("yyyyMMddHHmmss"), Name);
             var spacing = string.Join("", Enumerable.Repeat(Environment.NewLine, 5));
             var fileContents = string.Format("{0}{1}{2}", ex, spacing, results);
             logger.Error(fileName + fileContents);
@@ -709,11 +740,10 @@ namespace Jackett.Common.Indexers
 
     public abstract class BaseCachingWebIndexer : BaseWebIndexer
     {
-        protected BaseCachingWebIndexer(string link, string id, string name, string description,
-                                        IIndexerConfigurationService configService, WebClient client, Logger logger,
+        protected BaseCachingWebIndexer(IIndexerConfigurationService configService, WebClient client, Logger logger,
                                         ConfigurationData configData, IProtectionService p, ICacheService cacheService,
-                                        TorznabCapabilities caps = null, string downloadBase = null)
-            : base(link, id, name, description, configService, client, logger, configData, p, cacheService, caps, downloadBase)
+                                        string downloadBase = null)
+            : base(configService: configService, client: client, logger: logger, configData: configData, p: p, cacheService: cacheService, downloadBase: downloadBase)
         {
         }
 
@@ -727,6 +757,6 @@ namespace Jackett.Common.Indexers
 
         // TODO: remove this implementation and use gloal cache
         protected static List<CachedQueryResult> cache = new List<CachedQueryResult>();
-        protected static readonly TimeSpan cacheTime = new TimeSpan(0, 9, 0);
+        protected static readonly TimeSpan cacheTime = TimeSpan.FromMinutes(9);
     }
 }

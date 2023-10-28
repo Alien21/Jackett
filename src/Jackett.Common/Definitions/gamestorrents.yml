@@ -7,7 +7,6 @@ type: public
 encoding: UTF-8
 links:
   - https://www.gamestorrents.fm/
-  - https://gamestorrents.nocensor.sbs/
 legacylinks:
   - https://www.gamestorrents.com/
   - https://www.gamestorrents.tv/
@@ -15,6 +14,8 @@ legacylinks:
   - https://gamestorrents.nocensor.space/
   - https://gamestorrents.nocensor.work/
   - https://gamestorrents.nocensor.biz/
+  - https://gamestorrents.nocensor.sbs/
+  - https://gamestorrents.nocensor.world/
 
 caps:
   categorymappings:
@@ -41,6 +42,7 @@ download:
 search:
   paths:
     - path: /
+  allowEmptyInputs: true
   inputs:
     s: "{{ .Keywords }}"
 
@@ -70,7 +72,7 @@ search:
         - name: append
           args: " +01:00" # CET
         - name: dateparse
-          args: "02-01-2006 -07:00"
+          args: "dd-MM-yyyy zzz"
     size:
       selector: td:nth-child(3)
       filters:

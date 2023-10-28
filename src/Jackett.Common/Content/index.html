@@ -8,6 +8,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta charset="utf-8" />
     <meta name="referrer" content="no-referrer" /> <!-- Don't send referrer when loading third party resources (E.g. Empornium poster images won't load) -->
+    <meta name="robots" content="noindex, nofollow"/>
     <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
     <link rel="mask-icon" href="../jackett_medium.png" color="#35c5f4">
     <link rel="icon" type="image/ico" href="../favicon.ico" />
@@ -21,17 +22,17 @@
     <script type="text/javascript" src="../libs/handlebarsextend.js?changed=2017083001"></script>
     <script type="text/javascript" src="../bootstrap/bootstrap.min.js?changed=2017083001"></script>
     <script type="text/javascript" src="../libs/bootstrap-notify.js?changed=2017083001"></script>
-    <script type="text/javascript" src="../libs/bootstrap-multiselect.js?changed=2017083001"></script>
+    <script type="text/javascript" src="../libs/bootstrap-multiselect.js?changed=20230107001"></script>
     <script type="text/javascript" src="../libs/tagify.min.js?changed=11662"></script>
     <script type="text/javascript" src="../libs/jQuery.tagify.min.js?changed=11662"></script>
 
     <link rel="stylesheet" type="text/css" href="../bootstrap/bootstrap.min.css?changed=2017083001">
     <link rel="stylesheet" type="text/css" href="../animate.css?changed=2017083001">
     <link rel="stylesheet" type="text/css" href="../css/tagify.css?changed=11662">
-    <link rel="stylesheet" type="text/css" href="../custom.css?changed=20220512" media="only screen and (min-device-width: 480px)">
-    <link rel="stylesheet" type="text/css" href="../custom_mobile.css?changed=20220512" media="only screen and (max-device-width: 480px)">
+    <link rel="stylesheet" type="text/css" href="../custom.css?changed=20220721002" media="only screen and (min-device-width: 480px)">
+    <link rel="stylesheet" type="text/css" href="../custom_mobile.css?changed=20220721002" media="only screen and (max-device-width: 480px)">
     <link rel="stylesheet" type="text/css" href="../css/jquery.dataTables.min.css?changed=2017083001">
-    <link rel="stylesheet" type="text/css" href="../css/bootstrap-multiselect.css?changed=2017083001" />
+    <link rel="stylesheet" type="text/css" href="../css/bootstrap-multiselect.css?changed=20230107001" />
     <link rel="stylesheet" type="text/css" href="../css/font-awesome.min.css?changed=2017083001">
     <title>Jackett</title>
 </head>
@@ -80,7 +81,7 @@
             <h4>Adding a Jackett indexer in Sonarr or Radarr</h4>
             <ol>
                 <li>Go to <b>Settings > Indexers > Add > Torznab > Custom</b>.</li>
-                <li>Click on the indexers corresponding <button type="button" class="btn btn-xs btn-info">Copy Torznab Feed</button> button and paste it into the Sonarr/Radarr <b>URL</b> field.</li>
+                <li>Click on the indexers corresponding <button type="button" class="disabled btn btn-xs btn-info">Copy Torznab Feed</button> button and paste it into the Sonarr/Radarr <b>URL</b> field.</li>
                 <li>For the <b>API key</b> use <b class="api-key-text"></b>.</li>
                 <li>Configure the correct category IDs via the <b>(Anime) Categories</b> options. See the Jackett indexer configuration for a list of supported categories.</li>
             </ol>
@@ -88,12 +89,12 @@
             <ol>
                 <li>Go to <b>Settings > Searchers</b>.</li>
                 <li>Enable <b>TorrentPotato</b>.
-                <li>Click on the indexers corresponding <button type="button" class="btn btn-xs btn-info">Copy Potato Feed</button> button and paste it into the CouchPotato <b>host</b> field.</li>
+                <li>Click on the indexers corresponding <button type="button" class="disabled btn btn-xs btn-info">Copy Potato Feed</button> button and paste it into the CouchPotato <b>host</b> field.</li>
                 <li>For the <b>Passkey</b> use <b class="api-key-text"></b>. Leave the <b>username</b> field blank.</li>
             </ol>
             <h4>Adding a Jackett indexer to RSS clients (RSS feed)</h4>
             <ol>
-                <li>Click on the indexers corresponding <button type="button" class="btn btn-xs btn-info">Copy RSS Feed</button> button and paste it into the URL field of the RSS client.</li>
+                <li>Click on the indexers corresponding <button type="button" class="disabled btn btn-xs btn-info">Copy RSS Feed</button> button and paste it into the URL field of the RSS client.</li>
                 <li>
                     You can adjust the <b>q</b> (search string) and <b>cat</b> (categories) arguments accordingly.
                     E.g. <b>...&cat=2030,2040&q=big+buck+bunny</b> will search for "big buck bunny" in the Movies/SD (2030) and Movies/HD (2040) categories (See the indexer configuration for available categories).
@@ -177,6 +178,10 @@
         <div class="input-area">
             <span class="input-header">External access: </span>
             <input id="jackett-allowext" class="form-control input-right" type="checkbox" />
+        </div>
+        <div class="input-area">
+            <span class="input-header">Local bind address: </span>
+            <input id="jackett-local-bind-address" class="form-control input-right" type="text" value="" placeholder="127.0.0.1">
         </div>
         <div class="input-area">
             <span class="input-header">Allow CORS: </span>
@@ -446,29 +451,29 @@
                                     <th>Name</th>
                                     <th>Size</th>
                                     <th>Size</th>
-                                    <th>Files</th>
+                                    <th title="Files">F</th>
                                     <th>Category</th>
-                                    <th>Grabs</th>
-                                    <th>Seeds</th>
-                                    <th>Leechers</th>
-                                    <th class="fit">DL Factor</th>
-                                    <th class="fit">UL Factor</th>
-                                    <th>Download</th>
+                                    <th title="Grabs">G</th>
+                                    <th title="Seeders">S</th>
+                                    <th title="Leechers">L</th>
+                                    <th title="DownloadVolumeFactor" class="fit">DLF</th>
+                                    <th title="UploadVolumeFactor" class="fit">ULF</th>
+                                    <th title="Download">DL</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {{#each releases}}
-                                <tr class="jackett-releases-row" data-imdb="{{Imdb}}" data-tmdb="{{TMDb}}" data-tvdb="{{TVDBId}}" data-douban="{{DoubanId}}" data-poster="{{Poster}}" data-description="{{Description}}">
+                                <tr class="jackett-releases-row" data-imdb="{{Imdb}}" data-tmdb="{{TMDb}}" data-tvdb="{{TVDBId}}" data-tvmaze="{{TVMazeId}}" data-trakt="{{TraktId}}" data-douban="{{DoubanId}}" data-poster="{{Poster}}" data-description="{{Description}}">
                                     <td class="fit">{{PublishDate}}</td>
                                     <td class="fit">{{FirstSeen}}</td>
                                     <td class="fit">{{jacketTimespan PublishDate}}</td>
                                     <td class="fit">{{jacketTimespan FirstSeen}}</td>
                                     <td class="fit">{{Tracker}}</td>
-                                    <td class="Title"><a href="{{Details}}">{{Title}}</a> <span class="release-labels"></span></td>
+                                    <td class="Title" style="word-break: break-all"><a href="{{Details}}" target="_blank">{{Title}}</a> <span class="release-labels"></span></td>
                                     <td class="fit">{{Size}}</td>
                                     <td class="fit">{{jacketSize Size}}</td>
                                     <td class="fit">{{Files}}</td>
-                                    <td class="fit Cat">{{CategoryDesc}}</td>
+                                    <td class="fit Cat" style="word-break: break-all">{{CategoryDesc}}</td>
                                     <td class="fit">{{Grabs}}</td>
                                     <td class="fit">{{Seeders}}</td>
                                     <td class="fit">{{Peers}}</td>
@@ -528,10 +533,10 @@
                     </div>
                     <div class="modal-body">
                         <p>You can search all configured indexers from this screen.</p>
-                        <label for="text">Query</label>
+                        <label for="searchquery">Query</label>
                         <input class="form-control" type="text" name="query" id="searchquery" />
                         {{#if filters}}
-                        <label for="filter">Filter</label>
+                        <label for="searchFilter">Filter</label>
                         <select name="filter" id="searchFilter">
                           <option value="all">all</option>
                           {{#each filters}}
@@ -539,9 +544,9 @@
                           {{/each}}
                         </select>
                         {{/if}}
-                        <label for="tracker">Tracker</label>
+                        <label for="searchTracker">Tracker</label>
                         <select name="tracker" id="searchTracker" multiple="multiple"></select>
-                        <label for="category">Category</label>
+                        <label for="searchCategory">Category</label>
                         <select name="category" id="searchCategory" multiple="multiple"></select>
                         <button id="jackett-search-perform" class="btn btn-success btn-sm"><span class="fa fa-search"></span></button>
                         <div id="searchResults"></div>
@@ -565,42 +570,43 @@
             {{/if}}
             , {{/each}}
         </p>
+        <datalist id="jackett-search-saved-presets"></datalist>
         <table id="jackett-search-results-datatable" class="dataTable compact cell-border hover stripe">
             <thead>
                 <tr>
-                    <th>Published</th>
-                    <th>Published</th>
-                    <th>Tracker</th>
+                    <th class="text-center">Published</th>
+                    <th class="text-center">Published</th>
+                    <th class="text-center">Tracker</th>
                     <th>Name</th>
-                    <th>Size</th>
-                    <th>Size</th>
-                    <th>Files</th>
-                    <th>Category</th>
-                    <th>Grabs</th>
-                    <th>Seeds</th>
-                    <th>Leechers</th>
-                    <th>DL Factor</th>
-                    <th>UL Factor</th>
-                    <th>Download</th>
+                    <th class="text-center">Size</th>
+                    <th class="text-center">Size</th>
+                    <th class="text-center" title="Files">F</th>
+                    <th class="text-center">Category</th>
+                    <th class="text-center" title="Grabs">G</th>
+                    <th class="text-center" title="Seeders">S</th>
+                    <th class="text-center" title="Leechers">L</th>
+                    <th class="text-center fit" title="DownloadVolumeFactor">DLF</th>
+                    <th class="text-center fit" title="UploadVolumeFactor">ULF</th>
+                    <th class="text-center" title="Download">DL</th>
                 </tr>
             </thead>
             <tbody>
                 {{#each Results}}
-                <tr class="jackett-search-results-row" data-imdb="{{Imdb}}" data-tmdb="{{TMDb}}" data-tvdb="{{TVDBId}}" data-douban="{{DoubanId}}" data-poster="{{Poster}}" data-description="{{Description}}">
-                    <td>{{PublishDate}}</td>
-                    <td>{{jacketTimespan PublishDate}}</td>
-                    <td>{{Tracker}}</td>
-                    <td class="Title"><a href="{{Details}}" target="_blank">{{Title}}</a> <span class="release-labels"></span></td>
-                    <td>{{Size}}</td>
-                    <td class="fit">{{jacketSize Size}}</td>
-                    <td>{{Files}}</td>
-                    <td class="Cat">{{CategoryDesc}}</td>
-                    <td>{{Grabs}}</td>
-                    <td>{{Seeders}}</td>
-                    <td>{{Peers}}</td>
-                    <td class="DownloadVolumeFactor">{{DownloadVolumeFactor}}</td>
-                    <td class="UploadVolumeFactor">{{UploadVolumeFactor}}</td>
-                    <td class="downloadcolumn">
+                <tr class="jackett-search-results-row" data-imdb="{{Imdb}}" data-tmdb="{{TMDb}}" data-tvdb="{{TVDBId}}" data-tvmaze="{{TVMazeId}}" data-trakt="{{TraktId}}" data-douban="{{DoubanId}}" data-poster="{{Poster}}" data-description="{{Description}}">
+                    <td class="text-center">{{PublishDate}}</td>
+                    <td class="text-center" title="{{dateFormat PublishDate format="YYYY-MM-DD HH:mm:ss Z"}}">{{jacketTimespan PublishDate}}</td>
+                    <td class="text-center">{{Tracker}}</td>
+                    <td class="Title" style="word-break: break-all"><a href="{{Details}}" target="_blank">{{Title}}</a> <span class="release-labels"></span></td>
+                    <td class="text-right">{{Size}}</td>
+                    <td class="text-right fit">{{jacketSize Size}}</td>
+                    <td class="text-center">{{Files}}</td>
+                    <td class="text-center Cat" style="word-break: break-all">{{CategoryDesc}}</td>
+                    <td class="text-center">{{Grabs}}</td>
+                    <td class="text-center">{{Seeders}}</td>
+                    <td class="text-center">{{Peers}}</td>
+                    <td class="text-center DownloadVolumeFactor">{{DownloadVolumeFactor}}</td>
+                    <td class="text-center UploadVolumeFactor">{{UploadVolumeFactor}}</td>
+                    <td class="text-center downloadcolumn">
                         {{#if Link}}
                         <a class="downloadlink" title="Download locally" href="{{Link}}"><i class="fa fa-download"></i></a>
                         {{/if}}
@@ -698,7 +704,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                        <h4 class="modal-title">{{title}} - <a target="_blank" href="{{link}}">{{link}}</a></h4>
+                        <h4 class="modal-title">{{title}} - <a target="_blank" href="{{link}}" rel="noreferrer">{{link}}</a></h4>
                         {{#if description}}
                         <div class="alert alert-info">{{description}}</div>
                         {{/if}}
@@ -754,6 +760,6 @@
     </script>
 
     <script type="text/javascript" src="../libs/api.js?changed=2017083001"></script>
-    <script type="text/javascript" src="../custom.js?changed=20220606"></script>
+    <script type="text/javascript" src="../custom.js?changed=2023071401"></script>
 </body>
 </html>

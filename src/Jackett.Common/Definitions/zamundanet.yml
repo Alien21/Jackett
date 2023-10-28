@@ -6,8 +6,8 @@ language: bg-BG
 type: private
 encoding: windows-1251
 links:
-  - https://zamunda.net/
-  - https://zamunda.ch/
+  - https://zamunda.net/ # Bulgarian IP address filtering
+  - https://zamunda.ch/ # Bulgarian IP address filtering
 legacylinks:
   - http://zamunda.net/
   - http://zamunda.ch/
@@ -102,6 +102,10 @@ settings:
     options:
       desc: desc
       asc: asc
+  - name: ip_filtering
+    type: info
+    label: "IP Filtering"
+    default: "Zamunda.net allows only Bulgarian IP addressess. A <b>FlareSolverr</b> error means your IP was not accepted."
 
 login:
   path: takelogin.php
@@ -112,7 +116,8 @@ login:
   error:
     - selector: td.embedded:has(h2:contains("failed"))
   test:
-    path: bananas
+    path: index.php
+    selector: a[href="/logout.php"]
 
 search:
   paths:
@@ -132,6 +137,12 @@ search:
     selector: ".responsetop > tbody > tr:has(a[href^=\"banan?id=\"]){{ if .Config.freeleech }}:has(a[style=\"color: #b9a100;\"]){{ else }}{{ end }}"
 
   fields:
+    category:
+      selector: a[href^="list?cat="]
+      attribute: href
+      filters:
+        - name: querystring
+          args: cat
     title:
       selector: a[href^="/download.php"]
       attribute: onmouseover
@@ -143,12 +154,6 @@ search:
     details:
       selector: a[href^="banan?id="]
       attribute: href
-    category:
-      selector: a[href^="list?cat="]
-      attribute: href
-      filters:
-        - name: querystring
-          args: cat
     download:
       selector: a[href^="/download.php"]
       attribute: href
@@ -163,7 +168,7 @@ search:
         - name: append
           args: " +02:00" # EET
         - name: dateparse
-          args: "2006-01-0215:04:05 -07:00"
+          args: "yyyy-MM-ddHH:mm:ss zzz"
     seeders:
       selector: td:nth-child(8)
     leechers:
@@ -174,6 +179,16 @@ search:
       filters:
         - name: regexp
           args: src=\\'([^\s\\]+)
+    genre:
+      selector: td:nth-child(2) > a:nth-child(1)
+      attribute: onmouseover
+      filters:
+        - name: replace
+          args: ["<br>", " "]
+        - name: regexp
+          args: "Жанр:</b> (.+?)</td"
+    description:
+      text: "{{ .Result.genre }}"
     downloadvolumefactor:
       case:
         "a[style=\"color: #b9a100;\"][href^=\"banan?\"]": 0

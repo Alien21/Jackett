@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Jackett.Common.Models;
 using Jackett.Common.Models.IndexerConfig.Bespoke;
@@ -15,8 +15,17 @@ using NLog;
 namespace Jackett.Common.Indexers
 {
     [ExcludeFromCodeCoverage]
-    public class HDBitsApi : BaseWebIndexer
+    public class HDBitsApi : IndexerBase
     {
+        public override string Id => "hdbitsapi";
+        public override string Name => "HDBits (API)";
+        public override string Description => "The HighDefinition Bittorrent Community";
+        public override string SiteLink { get; protected set; } = "https://hdbits.org/";
+        public override string Language => "en-US";
+        public override string Type => "private";
+
+        public override TorznabCapabilities TorznabCaps => SetCapabilities();
+
         private string APIUrl => SiteLink + "api/";
 
         private new ConfigurationDataHDBitsApi configData
@@ -27,40 +36,39 @@ namespace Jackett.Common.Indexers
 
         public HDBitsApi(IIndexerConfigurationService configService, WebClient wc, Logger l, IProtectionService ps,
             ICacheService cs)
-            : base(id: "hdbitsapi",
-                   name: "HDBits (API)",
-                   description: "The HighDefinition Bittorrent Community",
-                   link: "https://hdbits.org/",
-                   caps: new TorznabCapabilities
-                   {
-                       TvSearchParams = new List<TvSearchParam>
-                       {
-                           TvSearchParam.Q, TvSearchParam.Season, TvSearchParam.Ep, TvSearchParam.TvdbId
-                       },
-                       MovieSearchParams = new List<MovieSearchParam>
-                       {
-                           MovieSearchParam.Q, MovieSearchParam.ImdbId
-                       }
-                   },
-                   configService: configService,
+            : base(configService: configService,
                    client: wc,
                    logger: l,
                    p: ps,
                    cacheService: cs,
                    configData: new ConfigurationDataHDBitsApi())
         {
-            Encoding = Encoding.UTF8;
-            Language = "en-US";
-            Type = "private";
+        }
 
-            AddCategoryMapping(6, TorznabCatType.Audio, "Audio Track");
-            AddCategoryMapping(3, TorznabCatType.TVDocumentary, "Documentary");
-            AddCategoryMapping(8, TorznabCatType.Other, "Misc/Demo");
-            AddCategoryMapping(1, TorznabCatType.Movies, "Movie");
-            AddCategoryMapping(4, TorznabCatType.Audio, "Music");
-            AddCategoryMapping(5, TorznabCatType.TVSport, "Sport");
-            AddCategoryMapping(2, TorznabCatType.TV, "TV");
-            AddCategoryMapping(7, TorznabCatType.XXX, "XXX");
+        private TorznabCapabilities SetCapabilities()
+        {
+            var caps = new TorznabCapabilities
+            {
+                TvSearchParams = new List<TvSearchParam>
+                {
+                    TvSearchParam.Q, TvSearchParam.Season, TvSearchParam.Ep, TvSearchParam.TvdbId
+                },
+                MovieSearchParams = new List<MovieSearchParam>
+                {
+                    MovieSearchParam.Q, MovieSearchParam.ImdbId
+                }
+            };
+
+            caps.Categories.AddCategoryMapping(6, TorznabCatType.Audio, "Audio Track");
+            caps.Categories.AddCategoryMapping(3, TorznabCatType.TVDocumentary, "Documentary");
+            caps.Categories.AddCategoryMapping(8, TorznabCatType.Other, "Misc/Demo");
+            caps.Categories.AddCategoryMapping(1, TorznabCatType.Movies, "Movie");
+            caps.Categories.AddCategoryMapping(4, TorznabCatType.Audio, "Music");
+            caps.Categories.AddCategoryMapping(5, TorznabCatType.TVSport, "Sport");
+            caps.Categories.AddCategoryMapping(2, TorznabCatType.TV, "TV");
+            caps.Categories.AddCategoryMapping(7, TorznabCatType.XXX, "XXX");
+
+            return caps;
         }
 
         public override async Task<IndexerConfigurationStatus> ApplyConfiguration(JToken configJson)
@@ -89,7 +97,7 @@ namespace Jackett.Common.Indexers
         {
             var requestData = new JObject();
             var queryString = query.GetQueryString();
-            var imdbId = ParseUtil.GetImdbID(query.ImdbID);
+            var imdbId = ParseUtil.GetImdbId(query.ImdbID);
 
             if (imdbId != null)
                 requestData["imdb"] = new JObject
@@ -103,11 +111,16 @@ namespace Jackett.Common.Indexers
                     ["id"] = query.TvdbID
                 };
 
-                if (query.Season != 0)
-                    requestData["tvdb"]["season"] = query.Season;
+                if (DateTime.TryParseExact($"{query.Season} {query.Episode}", "yyyy MM/dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var showDate))
+                    requestData["search"] = showDate.ToString("yyyy-MM-dd");
+                else
+                {
+                    if (query.Season != 0)
+                        requestData["tvdb"]["season"] = query.Season;
 
-                if (!string.IsNullOrEmpty(query.Episode))
-                    requestData["tvdb"]["episode"] = query.Episode;
+                    if (!string.IsNullOrEmpty(query.Episode))
+                        requestData["tvdb"]["episode"] = query.Episode;
+                }
             }
             else if (!string.IsNullOrWhiteSpace(queryString))
                 requestData["search"] = queryString;
@@ -132,6 +145,8 @@ namespace Jackett.Common.Indexers
             var releases = new List<ReleaseInfo>();
             foreach (JObject r in response["data"])
             {
+                if (configData.FilterFreeleech.Value && (string)r["freeleech"] != "yes")
+                    continue;
                 var title = (string)r["name"];
                 // if tv then match query keywords against title #12753
                 if (!query.IsImdbQuery && !query.MatchQueryStringAND(title))
@@ -160,7 +175,7 @@ namespace Jackett.Common.Indexers
                 };
 
                 if (r.ContainsKey("imdb"))
-                    release.Imdb = ParseUtil.GetImdbID((string)r["imdb"]["id"]);
+                    release.Imdb = ParseUtil.GetImdbId((string)r["imdb"]["id"]);
 
                 if (r.ContainsKey("tvdb"))
                     release.TVDBId = (long)r["tvdb"]["id"];

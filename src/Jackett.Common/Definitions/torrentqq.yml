@@ -7,23 +7,23 @@ type: public
 encoding: UTF-8
 followredirect: true
 links:
-  - https://torrentqq146.com/
+  - https://torrentqq280.com/
 legacylinks:
-  - https://torrentqq131.com/
-  - https://torrentqq132.com/
-  - https://torrentqq133.com/
-  - https://torrentqq134.com/
-  - https://torrentqq135.com/
-  - https://torrentqq136.com/
-  - https://torrentqq137.com/
-  - https://torrentqq138.com/
-  - https://torrentqq139.com/
-  - https://torrentqq140.com/
-  - https://torrentqq141.com/
-  - https://torrentqq142.com/
-  - https://torrentqq143.com/
-  - https://torrentqq144.com/
-  - https://torrentqq145.com/
+  - https://torrentqq265.com/
+  - https://torrentqq266.com/
+  - https://torrentqq267.com/
+  - https://torrentqq268.com/
+  - https://torrentqq269.com/
+  - https://torrentqq270.com/
+  - https://torrentqq271.com/
+  - https://torrentqq272.com/
+  - https://torrentqq273.com/
+  - https://torrentqq274.com/
+  - https://torrentqq275.com/
+  - https://torrentqq276.com/
+  - https://torrentqq277.com/
+  - https://torrentqq278.com/
+  - https://torrentqq279.com/
 
 caps:
   categorymappings:
@@ -39,7 +39,7 @@ caps:
 
   modes:
     search: [q]
-    tv-search: [q]
+    tv-search: [q, season, ep]
     movie-search: [q]
     music-search: [q]
     book-search: [q]
@@ -94,13 +94,13 @@ search:
       optional: true
       filters:
         - name: dateparse
-          args: "01-02"
+          args: "MM-dd"
     date_time:
       selector: div.wr-date:contains(":")
       optional: true
       filters:
         - name: dateparse
-          args: "15:04"
+          args: "HH:mm"
     date:
       text: "{{ if or .Result.date_time .Result.date_day }}{{ or .Result.date_time .Result.date_day }}{{ else }}now{{ end }}"
     size:

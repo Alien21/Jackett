@@ -41,6 +41,7 @@ caps:
     - {id: 190, cat: Movies, desc: "Movies/Netflix Film"}
     - {id: 195, cat: TV, desc: "TV/Exxen"}
     - {id: 199, cat: TV, desc: "TV/GAİN"}
+    - {id: 201, cat: TV, desc: "TV/Tabii"}
     - {id: 171, cat: Audio, desc: "Music"}
     - {id: 172, cat: Audio, desc: "Music/Turkish"}
     - {id: 173, cat: Audio, desc: "Music/Foreign"}
@@ -55,6 +56,7 @@ caps:
     - {id: 180, cat: PC/Games, desc: "PC/Games"}
     - {id: 181, cat: Console, desc: "Playstation"}
     - {id: 198, cat: Movies, desc: "Movies/Amazon Prime"}
+    - {id: 200, cat: Movies, desc: "Movies/Disney+"}
 
   modes:
     search: [q]
@@ -77,7 +79,7 @@ settings:
   - name: info
     type: info
     label: Layout
-    default: "<ol><li>Only the English Classic profile is supported.<li>Make sure to set the <b>Torrent Listing (Listeleme Biçimi)</b> option in your profile to <b>Classic (Klasik)</b><li>And set the <b>Language (Dil)</b> to <b>English</b><li>Using the <i>Modern</i> theme will prevent results, and using <i>Turkish</i> will prevent upload dates.</ol>"
+    default: "<ol><li>Only the English Classic profile is supported.</li><li>Make sure to set the <b>Torrent Listing (Listeleme Biçimi)</b> option in your profile to <b>Classic (Klasik)</b></li><li>And set the <b>Language (Dil)</b> to <b>English</b></li><li>Using the <i>Modern</i> theme will prevent results, and using <i>Turkish</i> will prevent upload dates.</li></ol>"
   - name: sort
     type: select
     label: Sort requested from site
@@ -123,9 +125,6 @@ login:
 search:
   paths:
     - path: /
-  keywordsfilters:
-    - name: re_replace
-      args: ["[^a-zA-Z0-9]+", "%25"]
   inputs:
     p: torrents
     pid: 32
@@ -136,11 +135,13 @@ search:
     "sortOptions[sortBy]": "{{ .Config.sort }}"
     "sortOptions[sortOrder]": "{{ .Config.type }}"
   error:
-    - selector: div.error:not(:contains("Hiçbir sonuç bulunamadı."))
+    - selector: div.error:not(:contains("Hiçbir sonuç bulunamadı.")):not(:contains("There are no results found.")):not(:contains("Click on The Flag to Change"))
     # does not support imdbid search and does not return imdb link in results.
 
   rows:
     selector: "table#torrents_table_classic > tbody > tr:has(td.torrent_name){{ if .Config.freeleech }}:has(img[title=\"FREE!\"]){{ else }}{{ end }}"
+    filters:
+      - name: andmatch
 
   fields:
     category:
@@ -157,34 +158,34 @@ search:
     download:
       selector: a[href*="?p=torrents&pid=10&action=download"]
       attribute: href
-    date_year:
-      # Uploaded 30-01-2019 15:02 by
-      selector: td.torrent_name:not(:contains(" at ")):not(:has(abbr[data-time]))
-      optional: true
-      filters:
-        - name: regexp
-          args: "Uploaded (.+?) by"
-        - name: append
-          args: " +00:00" # auto adjusted by site account profile
-        - name: dateparse
-          args: "02-01-2006 15:04 -07:00"
     date_day:
       # Uploaded Friday at 05:11 by
       # Uploaded Today at 00:48 by
       # Uploaded Yesterday at 23:57 by
       selector: td.torrent_name:contains(" at "):not(:has(abbr[data-time]))
+      # auto adjusted by site account profile
       optional: true
       filters:
         - name: regexp
           args: "Uploaded (.+?) by"
         - name: fuzzytime
+    date_year:
+      # Uploaded 30-01-2019 15:02 by
+      selector: td.torrent_name:not(:contains(" at ")):not(:has(abbr[data-time]))
+      # auto adjusted by site account profile
+      optional: true
+      filters:
+        - name: regexp
+          args: "Uploaded (.+?) by"
+        - name: dateparse
+          args: "dd-MM-yyyy HH:mm"
     date_unix:
       # within the hour (unix)
       selector: abbr[data-time]
       attribute: data-time
       optional: true
     date:
-      text: "{{ if or .Result.date_year .Result.date_unix .Result.date_day }}{{ or .Result.date_year .Result.date_unix .Result.date_day }}{{ else }}now{{ end }}"
+      text: "{{ if or .Result.date_day .Result.date_year .Result.date_unix }}{{ or .Result.date_day .Result.date_year .Result.date_unix }}{{ else }}now{{ end }}"
     size:
       selector: a[rel="torrent_size"]
     seeders:
@@ -206,5 +207,5 @@ search:
         "img[title=\"Upload Multiplier: 2\"]": 2
         "*": 1
     minimumratio:
-      text: 0.5
+      text: 0.7
 # TSUE 2.2

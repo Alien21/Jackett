@@ -61,7 +61,7 @@ namespace Jackett.Common.Utils.Clients
             {
                 // in case of error in DNS resolution, we use a fake proxy to avoid leaking the user IP (disabling proxy)
                 // https://github.com/Jackett/Jackett/issues/8826
-                var addresses = new[] { new IPAddress(2130706433) }; // 127.0.0.1
+                var addresses = new[] { IPAddress.Parse(serverConfig.LocalBindAddress) };
                 try
                 {
                     addresses = Dns.GetHostAddressesAsync(serverConfig.ProxyUrl).Result;
@@ -191,6 +191,7 @@ namespace Jackett.Common.Utils.Clients
             {
                 var body = "";
                 var bodySize = 0;
+                var isBinary = false;
                 if (result.ContentBytes != null && result.ContentBytes.Length > 0)
                 {
                     bodySize = result.ContentBytes.Length;
@@ -198,11 +199,20 @@ namespace Jackett.Common.Utils.Clients
                     if (contentString.StartsWith("<") || contentString.StartsWith("{") || contentString.StartsWith("["))
                         body = "\n" + contentString;
                     else
+                    {
                         body = " <BINARY>";
+                        isBinary = true;
+                    }
                 }
-                logger.Debug($@"WebClient({ClientType}): Returning {result.Status} => {
-                                     (result.IsRedirect ? result.RedirectingTo + " " : "")
-                                 }{bodySize} bytes{body}");
+                logger.Debug($@"WebClient({ClientType}): Returning {result.Status} => {(result.IsRedirect ? result.RedirectingTo + " " : "")}{bodySize} bytes{body}");
+                if (isBinary)
+                {
+                    // show the first 20 bytes in a hex dump
+                    var contentString = result.ContentString.Trim();
+                    contentString = contentString.Length <= 20 ? contentString : contentString.Substring(0, 20);
+                    var HexData = string.Join("", contentString.Select(c => c + "(" + ((int)c).ToString("X2") + ")"));
+                    logger.Debug(string.Format("WebClient({0}): HexDump20: {1}", ClientType, HexData));
+                }
             }
 
             return result;

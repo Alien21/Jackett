@@ -5,6 +5,7 @@ description: "Amigos Share Club is a Brazilian Private site for TV / MOVIES / GE
 language: pt-BR
 type: private
 encoding: UTF-8
+requestDelay: 2
 links:
   - https://cliente.amigos-share.club/
 legacylinks:
@@ -177,6 +178,9 @@ search:
     _quality:
       selector: div.list-group-item-content p.m-0 span.badge-primary:contains("1080p"), div.list-group-item-content p.m-0 span.badge-primary:contains("720p"), div.list-group-item-content p.m-0 span.badge-primary:contains("4k")
       optional: true
+      filters:
+        - name: replace
+          args: ["4k", "2160p"]
     _year:
       selector: div.list-group-item-content p.m-0 span.badge-primary[style$="#246AB6;"]
       optional: true
@@ -186,6 +190,10 @@ search:
     _language:
       selector: div.list-group-item-content p.m-0 span.badge-primary[style$="#b6249d;"]
       optional: true
+    genre:
+      selector: div.list-group-item-content p.m-0 span.badge-primary[style$="#1c38c2;"]
+    description:
+      text: "{{ .Result.genre }}"
     title:
       selector: a[href*="torrents-details.php?id="], a[href*="details-misc.php?id="]
       filters:
@@ -292,20 +300,18 @@ search:
         "[src$=\"/Scripts.png\"]": 128
         "[src$=\"/Vetores.png\"]": 124
         "[src$=\"/outros2.png\"]": 130
-    date_optional:
+    date:
       selector: p:contains("Lançado:")
+      # auto adjusted by site account profile
       optional: true
+      default: now
       filters:
         - name: regexp
           args: "Lançado: (.+?)$"
         - name: re_replace
           args: [" (\\d:)", " 0$1"]
-        - name: append
-          args: " +00:00" # auto adjusted by site account profile
         - name: dateparse
-          args: "02/01/06 15:04:05 -07:00"
-    date:
-      text: "{{ if .Result.date_optional }}{{ .Result.date_optional }}{{ else }}now{{ end }}"
+          args: "dd/MM/yy HH:mm:ss"
     size:
       selector: div.list-group-item-content p.m-0 span.badge-info
     seeders:

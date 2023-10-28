@@ -126,19 +126,20 @@ search:
     category:
       selector: a[href^="browse.php?cat="]
       attribute: href
+      optional: true
+      default: 38
       filters:
         - name: querystring
           args: cat
     title_default:
       # can be abbreviated
       selector: a[href^="details.php?id="]
-    title_optional:
+    title:
       # usually full length
       selector: a[href^="details.php?id="]
       attribute: title
       optional: true
-    title:
-      text: "{{ if .Result.title_optional }}{{ .Result.title_optional }}{{ else }}{{ .Result.title_default }}{{ end }}"
+      default: "{{ .Result.title_default }}"
     details:
       selector: a[href^="details.php?id="]
       attribute: href
@@ -166,7 +167,7 @@ search:
         - name: replace
           args: ["\xA0", " "]
         - name: dateparse
-          args: "2006-01-02 15:04:05 -07:00"
+          args: "yyyy-MM-dd HH:mm:ss zzz"
     files:
       selector: td:nth-child(5)
     size:

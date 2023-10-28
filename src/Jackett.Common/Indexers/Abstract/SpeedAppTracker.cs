@@ -6,7 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Jackett.Common.Models;
-using Jackett.Common.Models.IndexerConfig;
+using Jackett.Common.Models.IndexerConfig.Bespoke;
 using Jackett.Common.Services.Interfaces;
 using Jackett.Common.Utils;
 using Jackett.Common.Utils.Clients;
@@ -18,10 +18,13 @@ using WebClient = Jackett.Common.Utils.Clients.WebClient;
 namespace Jackett.Common.Indexers.Abstract
 {
     [ExcludeFromCodeCoverage]
-    public abstract class SpeedAppTracker : BaseWebIndexer
+    public abstract class SpeedAppTracker : IndexerBase
     {
-        protected virtual string ItemsPerPage => "100";
+        public override bool SupportsPagination => true;
+
         protected virtual bool UseP2PReleaseName => false;
+        protected virtual int minimumSeedTime => 172800; // 48h
+
         private readonly Dictionary<string, string> _apiHeaders = new Dictionary<string, string>
         {
             {"Accept", "application/json"},
@@ -32,22 +35,15 @@ namespace Jackett.Common.Indexers.Abstract
         private string SearchUrl => SiteLink + "api/torrent";
         private string _token;
 
-        private new ConfigurationDataBasicLoginWithEmail configData => (ConfigurationDataBasicLoginWithEmail)base.configData;
+        private new ConfigurationDataSpeedAppTracker configData => (ConfigurationDataSpeedAppTracker)base.configData;
 
-        protected SpeedAppTracker(string link, string id, string name, string description,
-            IIndexerConfigurationService configService, WebClient client, Logger logger,
-            IProtectionService p, ICacheService cs, TorznabCapabilities caps)
-            : base(id: id,
-                name: name,
-                description: description,
-                link: link,
-                caps: caps,
-                configService: configService,
-                client: client,
-                logger: logger,
-                p: p,
-                cacheService: cs,
-                configData: new ConfigurationDataBasicLoginWithEmail())
+        protected SpeedAppTracker(IIndexerConfigurationService configService, WebClient client, Logger logger, IProtectionService p, ICacheService cs)
+            : base(configService: configService,
+                   client: client,
+                   logger: logger,
+                   p: p,
+                   cacheService: cs,
+                   configData: new ConfigurationDataSpeedAppTracker())
         {
         }
 
@@ -89,10 +85,17 @@ namespace Jackett.Common.Indexers.Abstract
             //var categoryMapping = MapTorznabCapsToTrackers(query).Distinct().ToList();
             var qc = new List<KeyValuePair<string, string>> // NameValueCollection don't support cat[]=19&cat[]=6
             {
-                {"itemsPerPage", ItemsPerPage},
-                {"sort", "torrent.createdAt"},
-                {"direction", "desc"}
+                { "itemsPerPage", "100" },
+                { "includingDead", "1" },
+                { "sort", "torrent.createdAt" },
+                { "direction", "desc" }
             };
+
+            if (query.Limit > 0 && query.Offset > 0)
+            {
+                var page = query.Offset / query.Limit + 1;
+                qc.Add("page", page.ToString());
+            }
 
             foreach (var cat in MapTorznabCapsToTrackers(query))
                 qc.Add("categories[]", cat);
@@ -118,8 +121,17 @@ namespace Jackett.Common.Indexers.Abstract
             try
             {
                 var rows = JArray.Parse(response.ContentString);
+
                 foreach (var row in rows)
                 {
+                    var dlVolumeFactor = row.Value<double>("download_volume_factor");
+
+                    // skip non-freeleech results when freeleech only is set
+                    if (configData.FreeleechOnly.Value && dlVolumeFactor != 0)
+                    {
+                        continue;
+                    }
+
                     var id = row.Value<string>("id");
                     var link = new Uri($"{SiteLink}api/torrent/{id}/download");
                     var urlStr = row.Value<string>("url");
@@ -127,14 +139,17 @@ namespace Jackett.Common.Indexers.Abstract
                     var publishDate = DateTime.Parse(row.Value<string>("created_at"), CultureInfo.InvariantCulture);
                     var cat = row.Value<JToken>("category").Value<string>("id");
 
-                    // "description" field in API has too much HTML code
-                    var description = row.Value<string>("short_description");
+                    var description = "";
+                    var genres = row.Value<string>("short_description");
+                    char[] delimiters = { ',', ' ', '/', ')', '(', '.', ';', '[', ']', '"', '|', ':' };
+                    var genresSplit = genres.Split(delimiters, System.StringSplitOptions.RemoveEmptyEntries);
+                    var genresList = genresSplit.ToList();
+                    genres = string.Join(", ", genresList);
+                    if (!string.IsNullOrEmpty(genres))
+                        description = genres;
 
                     var posterStr = row.Value<string>("poster");
                     var poster = Uri.TryCreate(posterStr, UriKind.Absolute, out var posterUri) ? posterUri : null;
-
-                    var dlVolumeFactor = row.Value<double>("download_volume_factor");
-                    var ulVolumeFactor = row.Value<double>("upload_volume_factor");
 
                     var title = row.Value<string>("name");
                     // fix for #10883
@@ -159,10 +174,13 @@ namespace Jackett.Common.Indexers.Abstract
                         Seeders = row.Value<int>("seeders"),
                         Peers = row.Value<int>("leechers") + row.Value<int>("seeders"),
                         DownloadVolumeFactor = dlVolumeFactor,
-                        UploadVolumeFactor = ulVolumeFactor,
+                        UploadVolumeFactor = row.Value<double>("upload_volume_factor"),
                         MinimumRatio = 1,
-                        MinimumSeedTime = 172800 // 48 hours
+                        MinimumSeedTime = minimumSeedTime
                     };
+                    if (release.Genres == null)
+                        release.Genres = new List<string>();
+                    release.Genres = release.Genres.Union(genres.Split(',')).ToList();
 
                     releases.Add(release);
                 }

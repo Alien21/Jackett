@@ -18,8 +18,8 @@ caps:
 
   modes:
     search: [q]
-    tv-search: [q, season, ep]
-    movie-search: [q]
+    tv-search: [q, season, ep, imdbid, genre]
+    movie-search: [q, imdbid, genre]
 
 settings:
   - name: info_2fa
@@ -76,12 +76,18 @@ search:
     - path: torrents.php
   inputs:
     $raw: "{{ range .Categories }}filter_cat[{{.}}]=1&{{end}}"
-    searchtext: "{{ .Keywords }}"
+    searchtext: "{{ if .Query.IMDBID }}{{ .Query.IMDBID }}{{ else }}{{ .Keywords }}{{ end }}"
     order_by: "{{ .Config.sort }}"
     order_way: "{{ .Config.type }}"
     action: advanced
     filter_freeleech: "{{ if .Config.freeleech }}1{{ else }}{{ end }}"
-    taglist: ""
+    taglist: "{{ .Query.Genre }}"
+
+  keywordsfilters:
+    - name: re_replace
+      args: ["(?i)\\bS0*(\\d+)\\b", "$1"]
+    - name: re_replace
+      args: ["(?i)\\bS0*(\\d+)E0*(\\d+)\\b", "$1"]
 
   rows:
     selector: table#torrent_table > tbody > tr[class^="torrent row"]:has(a[href*="action=download"])
@@ -95,14 +101,31 @@ search:
           args: \[(\d+)\]
     title:
       selector: a[href^="/torrents.php?id="]
+      filters:
+        - name: re_replace # Seasons X-Y --> S0X-S0Y
+          args: ["(?i)\\bSeasons?\\s*(\\d)\\s*-\\s*(\\d)\\b", "S0$1-S0$2"]
+        - name: re_replace # Seasons X-YY --> S0X-SYY
+          args: ["(?i)\\bSeasons?\\s*(\\d)\\s*-\\s*(\\d+)\\b", "S0$1-S$2"]
+        - name: re_replace # Seasons XX-YY --> SXX-SYY
+          args: ["(?i)\\bSeasons?\\s*(\\d+)\\s*-\\s*(\\d+)\\b", "S$1-S$2"]
+        - name: re_replace # Season X --> S0X
+          args: ["(?i)\\bSeasons?\\s*(\\d)\\b", "S0$1"]
+        - name: re_replace # Season XX --> SXX
+          args: ["(?i)\\bSeasons?\\s*(\\d+)\\b", "S$1"]
+        - name: re_replace
+          args: ["(?i)\\bComplete\\s+Series\\b", ""]
     details:
       selector: a[href^="/torrents.php?id="]
       attribute: href
     download:
       selector: a[href^="torrents.php?action=download&id="]
       attribute: href
+    genre:
+      selector: div.tags
+      filters:
+        - name: validate
+          args: "Action, Adventure, Animation, Comedy, Crime, Documentary, Drama, Family, Fantasy, History, Horror, Kids, Music, Mystery, News, Reality, Romance, SciFi, Soap, Talk, Thriller, War, Western"
     description:
-      optional: true
       selector: div.tags
     poster:
       selector: td:nth-child(2) > script
@@ -118,11 +141,10 @@ search:
     date:
       selector: td:nth-child(5) > span
       attribute: title
+      # auto adjusted by site account profile
       filters:
-        - name: append
-          args: " +00:00" # auto adjusted by site account profile
         - name: dateparse
-          args: "Jan 02 2006, 15:04 -07:00"
+          args: "MMM dd yyyy, HH:mm"
     size:
       selector: td:nth-child(6)
     grabs:

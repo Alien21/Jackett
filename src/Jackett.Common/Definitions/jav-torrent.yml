@@ -33,18 +33,15 @@ search:
       selector: h5 a
       attribute: href
     download:
-      selector: a.button
+      selector: a[href*="/download/torrent/"]
       attribute: href
-    poster:
-      selector: img
-      attribute: data-src
+      optional: true
+    magnet:
+      selector: a[href^="magnet:?xt="]
+      attribute: href
+      optional: true
     date:
-      selector: p.is-6 a
-      filters:
-        - name: append
-          args: " -07:00" # PDT
-        - name: dateparse
-          args: "Jan. 02, 2006 -07:00"
+      text: now
     size:
       selector: span.is-size-6
     seeders:

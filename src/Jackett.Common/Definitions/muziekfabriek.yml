@@ -62,8 +62,8 @@ login:
   error:
     - selector: td.embedded:contains("fout")
   test:
-    path: /
-    selector: :has(a[href="logout.php"])
+    path: index.php
+    selector: a[href="logout.php"]
 
 download:
   selectors:
@@ -145,17 +145,15 @@ search:
         - name: append
           args: " +01:00" # CET
         - name: dateparse
-          args: "2 January 2006 15:04:05 -07:00"
-    seeders_optional:
-      optional: true
-      selector: td:nth-child(4) table tr:nth-child(3) td:nth-child(5) font b
+          args: "d MMMM yyyy HH:mm:ss zzz"
     seeders:
-      text: "{{ if .Result.seeders_optional }}{{ .Result.seeders_optional }}{{ else }}0{{ end }}"
-    leechers_optional:
+      selector: td:nth-child(4) table tr:nth-child(3) td:nth-child(5) font b
       optional: true
-      selector: td:nth-child(4) table tr:nth-child(3) td:nth-child(5) font font b
+      default: 0
     leechers:
-      text: "{{ if .Result.leechers_optional }}{{ .Result.leechers_optional }}{{ else }}0{{ end }}"
+      selector: td:nth-child(4) table tr:nth-child(3) td:nth-child(5) font font b
+      optional: true
+      default: 0
     downloadvolumefactor:
       text: 0
     uploadvolumefactor:

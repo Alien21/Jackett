@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AngleSharp.Html.Parser;
 using Jackett.Common.Models;
@@ -18,11 +18,14 @@ using static Jackett.Common.Models.IndexerConfig.ConfigurationData;
 namespace Jackett.Common.Indexers
 {
     [ExcludeFromCodeCoverage]
-    public class IPTorrents : BaseWebIndexer
+    public class IPTorrents : IndexerBase
     {
-        private string SearchUrl => SiteLink + "t";
-
-        public override string[] AlternativeSiteLinks { get; protected set; } = {
+        public override string Id => "iptorrents";
+        public override string Name => "IPTorrents";
+        public override string Description => "Always a step ahead.";
+        public override string SiteLink { get; protected set; } = "https://iptorrents.com/";
+        public override string[] AlternativeSiteLinks => new[]
+        {
             "https://iptorrents.com/",
             "https://www.iptorrents.com/",
             "https://iptorrents.me/",
@@ -34,10 +37,11 @@ namespace Jackett.Common.Indexers
             "https://ipt.workisboring.net/",
             "https://ipt.lol/",
             "https://ipt.cool/",
-            "https://ipt.world/"
+            "https://ipt.world/",
+            "https://ipt.octopus.town/"
         };
-
-        public override string[] LegacySiteLinks { get; protected set; } = {
+        public override string[] LegacySiteLinks => new[]
+        {
             "https://ipt-update.com/",
             "http://ipt.read-books.org/",
             "http://alien.eating-organic.net/",
@@ -48,46 +52,27 @@ namespace Jackett.Common.Indexers
             "http://baywatch.workisboring.com/",
             "https://iptorrents.eu/"
         };
+        public override string Language => "en-US";
+        public override string Type => "private";
+
+        public override bool SupportsPagination => true;
+
+        public override TorznabCapabilities TorznabCaps => SetCapabilities();
+
+        private string SearchUrl => SiteLink + "t";
 
         private new ConfigurationDataCookieUA configData => (ConfigurationDataCookieUA)base.configData;
 
         public IPTorrents(IIndexerConfigurationService configService, WebClient wc, Logger l, IProtectionService ps,
             ICacheService cs)
-            : base(id: "iptorrents",
-                   name: "IPTorrents",
-                   description: "Always a step ahead.",
-                   link: "https://iptorrents.com/",
-                   caps: new TorznabCapabilities
-                   {
-                       TvSearchParams = new List<TvSearchParam>
-                       {
-                           TvSearchParam.Q, TvSearchParam.Season, TvSearchParam.Ep, TvSearchParam.ImdbId
-                       },
-                       MovieSearchParams = new List<MovieSearchParam>
-                       {
-                           MovieSearchParam.Q, MovieSearchParam.ImdbId
-                       },
-                       MusicSearchParams = new List<MusicSearchParam>
-                       {
-                           MusicSearchParam.Q
-                       },
-                       BookSearchParams = new List<BookSearchParam>
-                       {
-                           BookSearchParam.Q
-                       }
-                   },
-                   configService: configService,
+            : base(configService: configService,
                    client: wc,
                    logger: l,
                    p: ps,
                    cacheService: cs,
                    configData: new ConfigurationDataCookieUA("For best results, change the 'Torrents per page' option to 100 and check the 'Torrents - Show files count' option in the website Settings."))
         {
-            Encoding = Encoding.UTF8;
-            Language = "en-US";
-            Type = "private";
-
-            var sort = new ConfigurationData.SingleSelectConfigurationItem("Sort requested from site", new Dictionary<string, string>
+            var sort = new SingleSelectConfigurationItem("Sort requested from site", new Dictionary<string, string>
                 {
                     {"time", "created"},
                     {"size", "size"},
@@ -98,78 +83,111 @@ namespace Jackett.Common.Indexers
             configData.AddDynamic("sort", sort);
 
             configData.AddDynamic("freeleech", new BoolConfigurationItem("Search freeleech only") { Value = false });
+        }
 
-            AddCategoryMapping(72, TorznabCatType.Movies, "Movies");
-            AddCategoryMapping(87, TorznabCatType.Movies3D, "Movie/3D");
-            AddCategoryMapping(77, TorznabCatType.MoviesSD, "Movie/480p");
-            AddCategoryMapping(101, TorznabCatType.MoviesUHD, "Movie/4K");
-            AddCategoryMapping(89, TorznabCatType.MoviesBluRay, "Movie/BD-R");
-            AddCategoryMapping(90, TorznabCatType.MoviesHD, "Movie/BD-Rip");
-            AddCategoryMapping(96, TorznabCatType.MoviesSD, "Movie/Cam");
-            AddCategoryMapping(6, TorznabCatType.MoviesDVD, "Movie/DVD-R");
-            AddCategoryMapping(48, TorznabCatType.MoviesHD, "Movie/HD/Bluray");
-            AddCategoryMapping(54, TorznabCatType.Movies, "Movie/Kids");
-            AddCategoryMapping(62, TorznabCatType.MoviesSD, "Movie/MP4");
-            AddCategoryMapping(38, TorznabCatType.MoviesForeign, "Movie/Non-English");
-            AddCategoryMapping(68, TorznabCatType.Movies, "Movie/Packs");
-            AddCategoryMapping(20, TorznabCatType.MoviesWEBDL, "Movie/Web-DL");
-            AddCategoryMapping(100, TorznabCatType.MoviesHD, "Movie/x265");
-            AddCategoryMapping(7, TorznabCatType.MoviesSD, "Movie/Xvid");
+        private TorznabCapabilities SetCapabilities()
+        {
+            var caps = new TorznabCapabilities
+            {
+                TvSearchParams = new List<TvSearchParam>
+                {
+                    TvSearchParam.Q, TvSearchParam.Season, TvSearchParam.Ep, TvSearchParam.ImdbId, TvSearchParam.Genre
+                },
+                MovieSearchParams = new List<MovieSearchParam>
+                {
+                    MovieSearchParam.Q, MovieSearchParam.ImdbId, MovieSearchParam.Genre
+                },
+                MusicSearchParams = new List<MusicSearchParam>
+                {
+                    MusicSearchParam.Q
+                },
+                BookSearchParams = new List<BookSearchParam>
+                {
+                    BookSearchParam.Q
+                },
+                TvSearchImdbAvailable = true
+            };
 
-            AddCategoryMapping(73, TorznabCatType.TV, "TV");
-            AddCategoryMapping(26, TorznabCatType.TVDocumentary, "TV/Documentaries");
-            AddCategoryMapping(55, TorznabCatType.TVSport, "Sports");
-            AddCategoryMapping(78, TorznabCatType.TVSD, "TV/480p");
-            AddCategoryMapping(23, TorznabCatType.TVHD, "TV/BD");
-            AddCategoryMapping(24, TorznabCatType.TVSD, "TV/DVD-R");
-            AddCategoryMapping(25, TorznabCatType.TVSD, "TV/DVD-Rip");
-            AddCategoryMapping(66, TorznabCatType.TVSD, "TV/Mobile");
-            AddCategoryMapping(82, TorznabCatType.TVForeign, "TV/Non-English");
-            AddCategoryMapping(65, TorznabCatType.TV, "TV/Packs");
-            AddCategoryMapping(83, TorznabCatType.TVForeign, "TV/Packs/Non-English");
-            AddCategoryMapping(79, TorznabCatType.TVSD, "TV/SD/x264");
-            AddCategoryMapping(22, TorznabCatType.TVWEBDL, "TV/Web-DL");
-            AddCategoryMapping(5, TorznabCatType.TVHD, "TV/x264");
-            AddCategoryMapping(99, TorznabCatType.TVHD, "TV/x265");
-            AddCategoryMapping(4, TorznabCatType.TVSD, "TV/Xvid");
+            caps.Categories.AddCategoryMapping(72, TorznabCatType.Movies, "Movies");
+            caps.Categories.AddCategoryMapping(87, TorznabCatType.Movies3D, "Movie/3D");
+            caps.Categories.AddCategoryMapping(77, TorznabCatType.MoviesSD, "Movie/480p");
+            caps.Categories.AddCategoryMapping(101, TorznabCatType.MoviesUHD, "Movie/4K");
+            caps.Categories.AddCategoryMapping(89, TorznabCatType.MoviesBluRay, "Movie/BD-R");
+            caps.Categories.AddCategoryMapping(90, TorznabCatType.MoviesHD, "Movie/BD-Rip");
+            caps.Categories.AddCategoryMapping(96, TorznabCatType.MoviesSD, "Movie/Cam");
+            caps.Categories.AddCategoryMapping(6, TorznabCatType.MoviesDVD, "Movie/DVD-R");
+            caps.Categories.AddCategoryMapping(48, TorznabCatType.MoviesHD, "Movie/HD/Bluray");
+            caps.Categories.AddCategoryMapping(54, TorznabCatType.Movies, "Movie/Kids");
+            caps.Categories.AddCategoryMapping(62, TorznabCatType.MoviesSD, "Movie/MP4");
+            caps.Categories.AddCategoryMapping(38, TorznabCatType.MoviesForeign, "Movie/Non-English");
+            caps.Categories.AddCategoryMapping(68, TorznabCatType.Movies, "Movie/Packs");
+            caps.Categories.AddCategoryMapping(20, TorznabCatType.MoviesWEBDL, "Movie/Web-DL");
+            caps.Categories.AddCategoryMapping(100, TorznabCatType.MoviesHD, "Movie/x265");
+            caps.Categories.AddCategoryMapping(7, TorznabCatType.MoviesSD, "Movie/Xvid");
 
-            AddCategoryMapping(74, TorznabCatType.Console, "Games");
-            AddCategoryMapping(2, TorznabCatType.ConsoleOther, "Games/Mixed");
-            AddCategoryMapping(47, TorznabCatType.ConsoleOther, "Games/Nintendo");
-            AddCategoryMapping(43, TorznabCatType.PCGames, "Games/PC-ISO");
-            AddCategoryMapping(45, TorznabCatType.PCGames, "Games/PC-Rip");
-            AddCategoryMapping(71, TorznabCatType.ConsolePS4, "Games/Playstation");
-            AddCategoryMapping(50, TorznabCatType.ConsoleWii, "Games/Wii");
-            AddCategoryMapping(44, TorznabCatType.ConsoleXBox, "Games/Xbox");
+            caps.Categories.AddCategoryMapping(73, TorznabCatType.TV, "TV");
+            caps.Categories.AddCategoryMapping(26, TorznabCatType.TVDocumentary, "TV/Documentaries");
+            caps.Categories.AddCategoryMapping(55, TorznabCatType.TVSport, "Sports");
+            caps.Categories.AddCategoryMapping(78, TorznabCatType.TVSD, "TV/480p");
+            caps.Categories.AddCategoryMapping(23, TorznabCatType.TVHD, "TV/BD");
+            caps.Categories.AddCategoryMapping(24, TorznabCatType.TVSD, "TV/DVD-R");
+            caps.Categories.AddCategoryMapping(25, TorznabCatType.TVSD, "TV/DVD-Rip");
+            caps.Categories.AddCategoryMapping(66, TorznabCatType.TVSD, "TV/Mobile");
+            caps.Categories.AddCategoryMapping(82, TorznabCatType.TVForeign, "TV/Non-English");
+            caps.Categories.AddCategoryMapping(65, TorznabCatType.TV, "TV/Packs");
+            caps.Categories.AddCategoryMapping(83, TorznabCatType.TVForeign, "TV/Packs/Non-English");
+            caps.Categories.AddCategoryMapping(79, TorznabCatType.TVSD, "TV/SD/x264");
+            caps.Categories.AddCategoryMapping(22, TorznabCatType.TVWEBDL, "TV/Web-DL");
+            caps.Categories.AddCategoryMapping(5, TorznabCatType.TVHD, "TV/x264");
+            caps.Categories.AddCategoryMapping(99, TorznabCatType.TVHD, "TV/x265");
+            caps.Categories.AddCategoryMapping(4, TorznabCatType.TVSD, "TV/Xvid");
 
-            AddCategoryMapping(75, TorznabCatType.Audio, "Music");
-            AddCategoryMapping(3, TorznabCatType.AudioMP3, "Music/Audio");
-            AddCategoryMapping(80, TorznabCatType.AudioLossless, "Music/Flac");
-            AddCategoryMapping(93, TorznabCatType.Audio, "Music/Packs");
-            AddCategoryMapping(37, TorznabCatType.AudioVideo, "Music/Video");
-            AddCategoryMapping(21, TorznabCatType.AudioOther, "Podcast");
+            caps.Categories.AddCategoryMapping(74, TorznabCatType.Console, "Games");
+            caps.Categories.AddCategoryMapping(2, TorznabCatType.ConsoleOther, "Games/Mixed");
+            caps.Categories.AddCategoryMapping(47, TorznabCatType.ConsoleOther, "Games/Nintendo");
+            caps.Categories.AddCategoryMapping(43, TorznabCatType.PCGames, "Games/PC-ISO");
+            caps.Categories.AddCategoryMapping(45, TorznabCatType.PCGames, "Games/PC-Rip");
+            caps.Categories.AddCategoryMapping(71, TorznabCatType.ConsolePS4, "Games/Playstation");
+            caps.Categories.AddCategoryMapping(50, TorznabCatType.ConsoleWii, "Games/Wii");
+            caps.Categories.AddCategoryMapping(44, TorznabCatType.ConsoleXBox, "Games/Xbox");
 
-            AddCategoryMapping(76, TorznabCatType.Other, "Miscellaneous");
-            AddCategoryMapping(60, TorznabCatType.TVAnime, "Anime");
-            AddCategoryMapping(1, TorznabCatType.PC0day, "Appz");
-            AddCategoryMapping(86, TorznabCatType.PC0day, "Appz/Non-English");
-            AddCategoryMapping(64, TorznabCatType.AudioAudiobook, "AudioBook");
-            AddCategoryMapping(35, TorznabCatType.Books, "Books");
-            AddCategoryMapping(102, TorznabCatType.Books, "Books/Non-English");
-            AddCategoryMapping(94, TorznabCatType.BooksComics, "Comics");
-            AddCategoryMapping(95, TorznabCatType.BooksOther, "Educational");
-            AddCategoryMapping(98, TorznabCatType.Other, "Fonts");
-            AddCategoryMapping(69, TorznabCatType.PCMac, "Mac");
-            AddCategoryMapping(92, TorznabCatType.BooksMags, "Magazines / Newspapers");
-            AddCategoryMapping(58, TorznabCatType.PCMobileOther, "Mobile");
-            AddCategoryMapping(36, TorznabCatType.Other, "Pics/Wallpapers");
+            caps.Categories.AddCategoryMapping(75, TorznabCatType.Audio, "Music");
+            caps.Categories.AddCategoryMapping(3, TorznabCatType.AudioMP3, "Music/Audio");
+            caps.Categories.AddCategoryMapping(80, TorznabCatType.AudioLossless, "Music/Flac");
+            caps.Categories.AddCategoryMapping(93, TorznabCatType.Audio, "Music/Packs");
+            caps.Categories.AddCategoryMapping(37, TorznabCatType.AudioVideo, "Music/Video");
+            caps.Categories.AddCategoryMapping(21, TorznabCatType.AudioOther, "Podcast");
 
-            AddCategoryMapping(88, TorznabCatType.XXX, "XXX");
-            AddCategoryMapping(85, TorznabCatType.XXXOther, "XXX/Magazines");
-            AddCategoryMapping(8, TorznabCatType.XXX, "XXX/Movie");
-            AddCategoryMapping(81, TorznabCatType.XXX, "XXX/Movie/0Day");
-            AddCategoryMapping(91, TorznabCatType.XXXPack, "XXX/Packs");
-            AddCategoryMapping(84, TorznabCatType.XXXImageSet, "XXX/Pics/Wallpapers");
+            caps.Categories.AddCategoryMapping(76, TorznabCatType.Other, "Miscellaneous");
+            caps.Categories.AddCategoryMapping(60, TorznabCatType.TVAnime, "Anime");
+            caps.Categories.AddCategoryMapping(1, TorznabCatType.PC0day, "Appz");
+            caps.Categories.AddCategoryMapping(86, TorznabCatType.PC0day, "Appz/Non-English");
+            caps.Categories.AddCategoryMapping(64, TorznabCatType.AudioAudiobook, "AudioBook");
+            caps.Categories.AddCategoryMapping(35, TorznabCatType.Books, "Books");
+            caps.Categories.AddCategoryMapping(102, TorznabCatType.Books, "Books/Non-English");
+            caps.Categories.AddCategoryMapping(94, TorznabCatType.BooksComics, "Comics");
+            caps.Categories.AddCategoryMapping(95, TorznabCatType.BooksOther, "Educational");
+            caps.Categories.AddCategoryMapping(98, TorznabCatType.Other, "Fonts");
+            caps.Categories.AddCategoryMapping(69, TorznabCatType.PCMac, "Mac");
+            caps.Categories.AddCategoryMapping(92, TorznabCatType.BooksMags, "Magazines / Newspapers");
+            caps.Categories.AddCategoryMapping(58, TorznabCatType.PCMobileOther, "Mobile");
+            caps.Categories.AddCategoryMapping(36, TorznabCatType.Other, "Pics/Wallpapers");
+
+            caps.Categories.AddCategoryMapping(88, TorznabCatType.XXX, "XXX");
+            caps.Categories.AddCategoryMapping(85, TorznabCatType.XXXOther, "XXX/Magazines");
+            caps.Categories.AddCategoryMapping(8, TorznabCatType.XXX, "XXX/Movie");
+            caps.Categories.AddCategoryMapping(81, TorznabCatType.XXX, "XXX/Movie/0Day");
+            caps.Categories.AddCategoryMapping(91, TorznabCatType.XXXPack, "XXX/Packs");
+            caps.Categories.AddCategoryMapping(84, TorznabCatType.XXXImageSet, "XXX/Pics/Wallpapers");
+
+            return caps;
+        }
+
+        public override void LoadValuesFromJson(JToken jsonConfig, bool useProtectionService = false)
+        {
+            base.LoadValuesFromJson(jsonConfig, useProtectionService);
+
+            webclient?.AddTrustedCertificate(new Uri(SiteLink).Host, "44E390F897BC01083CE3DB0E8266A210735470E3"); // for *.octopus.town  expired 02/Sep/23
         }
 
         public override async Task<IndexerConfigurationStatus> ApplyConfiguration(JToken configJson)
@@ -199,29 +217,81 @@ namespace Jackett.Common.Indexers
         {
             var releases = new List<ReleaseInfo>();
 
+            var validTagList = new List<string>
+            {
+                "action",
+                "adventure",
+                "animation",
+                "biography",
+                "comedy",
+                "crime",
+                "documentary",
+                "drama",
+                "family",
+                "fantasy",
+                "game-show",
+                "history",
+                "horror",
+                "music",
+                "musical",
+                "mystery",
+                "news",
+                "reality-tv",
+                "romance",
+                "sci-fi",
+                "sitcom",
+                "sport",
+                "talk-show",
+                "thriller",
+                "war",
+                "western"
+            };
+
+            /* notes:
+             * IPTorrents can search for genre (tags) using the default title&tags search
+             * qf=
+             * "" = Title and Tags
+             * ti = Title
+             * ta = Tags
+             * all = Title, Tags & Description
+             * adv = Advanced
+             *
+             * But only movies and tv have tags.
+             */
+
+            var headers = new Dictionary<string, string>();
+            if (!string.IsNullOrEmpty(configData.UserAgent.Value))
+                headers.Add("User-Agent", configData.UserAgent.Value);
+
             var qc = new NameValueCollection();
 
-
-            Dictionary<string, string> headers = null;
-
-            if (!string.IsNullOrEmpty(configData.UserAgent.Value))
-            {
-                headers = new Dictionary<string, string>();
-                headers.Add("User-Agent", configData.UserAgent.Value);
-            }
-
-            if (query.IsImdbQuery)
-                qc.Add("q", query.ImdbID);
-            else if (!string.IsNullOrWhiteSpace(query.GetQueryString()))
-                qc.Add("q", query.GetQueryString());
-
             foreach (var cat in MapTorznabCapsToTrackers(query))
-                qc.Add(cat, string.Empty);
+                qc.Set(cat, string.Empty);
 
             if (((BoolConfigurationItem)configData.GetDynamic("freeleech")).Value)
-                qc.Add("free", "on");
+                qc.Set("free", "on");
 
-            qc.Add("o", ((SingleSelectConfigurationItem)configData.GetDynamic("sort")).Value);
+            var searchQuery = new List<string>();
+
+            // IPT uses sphinx, which supports boolean operators and grouping
+            if (query.IsImdbQuery)
+                searchQuery.Add($"+({query.ImdbID})");
+            else if (query.IsGenreQuery)
+                searchQuery.Add($"+({query.Genre})");
+
+            if (!string.IsNullOrWhiteSpace(query.GetQueryString()))
+                searchQuery.Add($"+({query.GetQueryString()})");
+
+            if (searchQuery.Any())
+                qc.Set("q", $"{string.Join(" ", searchQuery)}");
+
+            qc.Set("o", ((SingleSelectConfigurationItem)configData.GetDynamic("sort")).Value);
+
+            if (query.Limit > 0 && query.Offset > 0)
+            {
+                var page = query.Offset / query.Limit + 1;
+                qc.Add("p", page.ToString());
+            }
 
             var searchUrl = SearchUrl + "?" + qc.GetQueryString();
             var response = await RequestWithCookiesAndRetryAsync(searchUrl, referer: SearchUrl, headers: headers);
@@ -233,20 +303,21 @@ namespace Jackett.Common.Indexers
             if (string.IsNullOrWhiteSpace(query.ImdbID) && string.IsNullOrWhiteSpace(query.SearchTerm) && results.Contains("No Torrents Found!"))
                 throw new Exception("Got No Torrents Found! Make sure your IPTorrents profile config contain proper default category settings.");
 
+            char[] delimiters = { ',', ' ', '/', ')', '(', '.', ';', '[', ']', '"', '|', ':' };
+
             try
             {
                 var parser = new HtmlParser();
-                var doc = parser.ParseDocument(results);
+                using var doc = parser.ParseDocument(results);
 
-                var rows = doc.QuerySelectorAll("table[id='torrents'] > tbody > tr");
+                var rows = doc.QuerySelectorAll("table[id=\"torrents\"] > tbody > tr");
                 foreach (var row in rows)
                 {
                     var qTitleLink = row.QuerySelector("a.hv");
                     if (qTitleLink == null) // no results
                         continue;
 
-                    // drop invalid char that seems to have cropped up in some titles. #6582
-                    var title = qTitleLink.TextContent.Trim().Replace("\u000f", "");
+                    var title = CleanTitle(qTitleLink.TextContent);
                     var details = new Uri(SiteLink + qTitleLink.GetAttribute("href").TrimStart('/'));
 
                     var qLink = row.QuerySelector("a[href^=\"/download.php/\"]");
@@ -257,6 +328,7 @@ namespace Jackett.Common.Indexers
                     var publishDate = DateTimeUtil.FromTimeAgo(dateSplit.First());
                     var description = descrSplit.Length > 1 ? "Tags: " + descrSplit.First().Trim() : "";
                     description += dateSplit.Length > 1 ? " Uploaded by: " + dateSplit.Last().Trim() : "";
+                    var releaseGenres = validTagList.Intersect(description.ToLower().Split(delimiters, StringSplitOptions.RemoveEmptyEntries)).ToList();
 
                     var catIcon = row.QuerySelector("td:nth-of-type(1) a");
                     if (catIcon == null)
@@ -266,7 +338,7 @@ namespace Jackett.Common.Indexers
                     // Torrents - Category column == Icons
                     var cat = MapTrackerCatToNewznab(catIcon.GetAttribute("href").Substring(1));
 
-                    var size = ReleaseInfo.GetBytes(row.Children[5].TextContent);
+                    var size = ParseUtil.GetBytes(row.Children[5].TextContent);
 
                     var colIndex = 6;
                     int? files = null;
@@ -289,6 +361,7 @@ namespace Jackett.Common.Indexers
                         PublishDate = publishDate,
                         Category = cat,
                         Description = description,
+                        Genres = releaseGenres,
                         Size = size,
                         Files = files,
                         Grabs = grabs,
@@ -309,6 +382,15 @@ namespace Jackett.Common.Indexers
             }
 
             return releases;
+        }
+
+        private static string CleanTitle(string title)
+        {
+            // drop invalid chars that seems to have cropped up in some titles. #6582
+            title = Regex.Replace(title, @"[\u0000-\u0008\u000A-\u001F\u0100-\uFFFF]", string.Empty, RegexOptions.Compiled);
+            title = Regex.Replace(title, @"[\(\[\{]REQ(UEST(ED)?)?[\)\]\}]", string.Empty, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+            return title.Trim(' ', '-', ':');
         }
     }
 }

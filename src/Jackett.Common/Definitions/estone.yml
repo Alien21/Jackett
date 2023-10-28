@@ -35,10 +35,10 @@ caps:
 
   modes:
     search: [q]
-    tv-search: [q, season, ep]
-    movie-search: [q]
-    music-search: [q]
-    book-search: [q]
+    tv-search: [q, season, ep, genre]
+    movie-search: [q, genre]
+    music-search: [q, genre]
+    book-search: [q, genre]
 
 settings:
   - name: username
@@ -83,7 +83,8 @@ login:
           - name: replace
             args: ["\");", ""]
   test:
-    path: letoltes.php
+    path: index.php
+    selector: a[href="logout.php"]
 
 search:
   paths:
@@ -95,7 +96,7 @@ search:
     # 0 name, 1 performer, 2 director
     miben: 0
     # genre
-    cimke: ""
+    cimke: "{{ .Query.Genre }}"
     # does not support imdbid search and does not return imdb link in results
 
   rows:
@@ -144,7 +145,7 @@ search:
         - name: append
           args: "+01:00" # CET
         - name: dateparse
-          args: "2006-01-02 15:04:05 -07:00"
+          args: "yyyy-MM-dd HH:mm:ss zzz"
     downloadvolumefactor:
       case:
         img[src="pic/free.png"]: 0
@@ -153,9 +154,13 @@ search:
       case:
         img[src="pic/dupla_up.png"]: 2
         "*": 1
+    genre:
+      selector: div i
+      filters:
+        - name: regexp
+          args: "\\((.+?)\\)"
     description:
-      selector: div:nth-child(2)
-      remove: a
+      text: "{{ .Result.genre }}"
     minimumratio:
       text: 1.0
     minimumseedtime:

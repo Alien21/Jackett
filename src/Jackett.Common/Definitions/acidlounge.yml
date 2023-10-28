@@ -5,6 +5,8 @@ description: "Acid Lounge (A-L) is a Private Torrent Tracker for 0DAY / GENERAL"
 language: en-US
 type: private
 encoding: UTF-8
+certificates:
+  - ed11f0187f4aafad54382796f112ecf4bec5d76b  # Expired 28 Oct 2023
 links:
   - https://www.acid-lounge.org.uk/
 
@@ -90,6 +92,7 @@ settings:
     options:
       desc: desc
       asc: asc
+
 login:
   path: Main/?act=Login
   method: form
@@ -104,7 +107,8 @@ login:
   error:
     - selector: div.errorWrap
   test:
-    path: browse.php
+    path: index.php
+    selector: a[href$="logout.php"]
 
 search:
   paths:
@@ -141,6 +145,13 @@ search:
     description:
       optional: true
       selector: span.torrent_small_desc
+    genre:
+      selector: span.torrent_small_desc
+      filters:
+        - name: regexp
+          args: "\\[.+?\\] \\[(.+?)\\]"
+        - name: replace
+          args: [" ", "_"]
     files:
       selector: td.torrent_table_files
     date:
@@ -149,7 +160,7 @@ search:
         - name: append
           args: " +01:00" # CET
         - name: dateparse
-          args: "2006-01-02 15:04:05 -07:00"
+          args: "yyyy-MM-dd HH:mm:ss zzz"
     size:
       selector: td.torrent_table_size
     grabs:

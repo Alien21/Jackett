@@ -1,14 +1,19 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Jackett.Common.Extensions;
 using Jackett.Common.Indexers.Abstract;
 using Jackett.Common.Models;
 using Jackett.Common.Services.Interfaces;
 using Jackett.Common.Utils;
 using Newtonsoft.Json.Linq;
 using NLog;
+using static Jackett.Common.Models.IndexerConfig.ConfigurationData;
 using WebClient = Jackett.Common.Utils.Clients.WebClient;
 
 namespace Jackett.Common.Indexers
@@ -16,36 +21,45 @@ namespace Jackett.Common.Indexers
     [ExcludeFromCodeCoverage]
     public class GreatPosterWall : GazelleTracker
     {
-        public GreatPosterWall(IIndexerConfigurationService configService, WebClient wc, Logger l, IProtectionService ps,
-            ICacheService cs)
-            : base(id: "greatposterwall",
-                   name: "GreatPosterWall",
-                   description: "GreatPosterWall (GPW) is a CHINESE Private site for MOVIES",
-                   link: "https://greatposterwall.com/",
-                   caps: new TorznabCapabilities
-                   {
-                       MovieSearchParams = new List<MovieSearchParam>
-                       {
-                           MovieSearchParam.Q, MovieSearchParam.ImdbId
-                       }
-                   },
-                   configService: configService,
+        public override string Id => "greatposterwall";
+        public override string Name => "GreatPosterWall";
+        public override string Description => "GreatPosterWall (GPW) is a CHINESE Private site for MOVIES";
+        public override string SiteLink { get; protected set; } = "https://greatposterwall.com/";
+        public override string Language => "zh-CN";
+        public override string Type => "private";
+
+        public override TorznabCapabilities TorznabCaps => SetCapabilities();
+
+        public GreatPosterWall(IIndexerConfigurationService configService, WebClient wc, Logger l, IProtectionService ps, ICacheService cs)
+            : base(configService: configService,
                    client: wc,
                    logger: l,
                    p: ps,
                    cs: cs,
                    supportsFreeleechTokens: true,
+                   supportsFreeleechOnly: true,
                    imdbInTags: false,
                    has2Fa: true,
                    useApiKey: false,
                    usePassKey: false,
-                   instructionMessageOptional: null
-                  )
+                   instructionMessageOptional: null)
         {
-            Language = "zh-CN";
-            Type = "private";
+            configData.AddDynamic("showFilename", new BoolConfigurationItem("Use the first torrent filename as the title") { Value = false });
+        }
 
-            AddCategoryMapping(1, TorznabCatType.Movies, "Movies 电影");
+        private TorznabCapabilities SetCapabilities()
+        {
+            var caps = new TorznabCapabilities
+            {
+                MovieSearchParams = new List<MovieSearchParam>
+                {
+                    MovieSearchParam.Q, MovieSearchParam.ImdbId, MovieSearchParam.Genre
+                }
+            };
+
+            caps.Categories.AddCategoryMapping(1, TorznabCatType.Movies, "Movies 电影");
+
+            return caps;
         }
 
         protected override async Task<IEnumerable<ReleaseInfo>> PerformQuery(TorznabQuery query)
@@ -57,7 +71,14 @@ namespace Jackett.Common.Indexers
                 query.ImdbID = null;
             }
 
-            return await base.PerformQuery(query);
+            var releases = await base.PerformQuery(query);
+
+            if (query.SearchTerm.IsNullOrWhiteSpace())
+            {
+                releases = releases.Take(50).ToList();
+            }
+
+            return releases;
         }
 
         protected override bool ReleaseInfoPostParse(ReleaseInfo release, JObject torrent, JObject result)
@@ -68,8 +89,6 @@ namespace Jackett.Common.Indexers
             var groupYear = (string)result["groupYear"];
             var title = new StringBuilder();
             title.Append(groupName);
-            if (!string.IsNullOrEmpty(groupSubName))
-                title.Append(" " + groupSubName + " ");
 
             if (!string.IsNullOrEmpty(groupYear) && groupYear != "0")
                 title.Append(" [" + groupYear + "]");
@@ -103,6 +122,13 @@ namespace Jackett.Common.Indexers
                 title.Append(" " + string.Join(" / ", flags));
 
             release.Title = title.ToString();
+
+            // option to overwrite the title with the first torrent filename #13646
+            if (((BoolConfigurationItem)configData.GetDynamic("showFilename")).Value)
+                release.Title = WebUtility.HtmlDecode((string)torrent["fileName"]);
+
+            release.DoubanId = ParseUtil.GetLongFromString((string)result["doubanId"]);
+
             switch ((string)torrent["freeType"])
             {
                 case "11":
@@ -129,12 +155,23 @@ namespace Jackett.Common.Indexers
 
             var imdbID = (string)result["imdbId"];
             if (!string.IsNullOrEmpty(imdbID))
-                release.Imdb = ParseUtil.GetImdbID(imdbID);
+                release.Imdb = ParseUtil.GetImdbId(imdbID);
 
             release.MinimumRatio = 1;
             release.MinimumSeedTime = 172800; // 48 hours
                                               // tag each results with Movie cats.
             release.Category = new List<int> { TorznabCatType.Movies.ID };
+            if (!string.IsNullOrEmpty(groupSubName))
+                release.Description = groupSubName;
+
+            var time = torrent.Value<string>("time");
+
+            if (time.IsNotNullOrWhiteSpace())
+            {
+                // Time is Chinese Time, add 8 hours difference from UTC
+                release.PublishDate = DateTime.ParseExact($"{time} +08:00", "yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal);
+            }
+
             return true;
         }
     }

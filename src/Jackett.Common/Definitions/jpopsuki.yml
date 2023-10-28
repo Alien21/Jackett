@@ -23,9 +23,9 @@ caps:
 
   modes:
     search: [q]
-    tv-search: [q, season, ep]
-    movie-search: [q]
-    music-search: [q, album, artist]
+    tv-search: [q, season, ep, genre]
+    movie-search: [q, genre]
+    music-search: [q, album, artist, genre]
 
 settings:
   - name: username
@@ -66,7 +66,8 @@ login:
   error:
     - selector: form#loginform > span.warning, font[color="red"]
   test:
-    path: torrents.php
+    path: index.php
+    selector: a[href^="logout.php?auth="]
 
 search:
     # https://jpopsuki.eu/ajax.php?section=torrents&artistname=&action=advanced&torrentname=snow+man&remastertitle=&filelist=&bitrate=&format=&media=&year=&freeleech=&remastered=&searchtags=&tags_type=0&order_by=s3&order_way=desc&enablegrouping=1
@@ -81,6 +82,9 @@ search:
     order_way: "{{ .Config.type }}"
     disablegrouping: 1
     section: torrents
+    searchtags: "{{ .Query.Genre }}"
+    # 0 Any, 1 All
+    tags_type: 1
 
   rows:
     selector: table#torrent_table > tbody > tr[class^="torrent"]
@@ -95,8 +99,13 @@ search:
     download:
       selector: a[href^="torrents.php?action=download&id="]
       attribute: href
-    description:
+    genre:
       selector: div.tags
+      filters:
+        - name: replace
+          args: [".", "_"]
+    description:
+      text: "{{ .Result.genre }}"
     title:
       selector: td:nth-last-child(7)
       remove: span, div.tags, a[title="View Comments"]
@@ -118,11 +127,10 @@ search:
     date:
       selector: td:nth-last-child(5)
       attribute: title
+      # auto adjusted by site account profile
       filters:
-        - name: append
-          args: " +00:00" # auto adjusted by site account profile
         - name: dateparse
-          args: "Jan 02 2006, 15:04 -07:00"
+          args: "MMM dd yyyy, HH:mm"
     size:
       selector: td:nth-last-child(4)
     grabs:

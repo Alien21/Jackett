@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Jackett.Common.Models;
 using Jackett.Common.Models.IndexerConfig;
@@ -16,9 +16,20 @@ using NLog;
 namespace Jackett.Common.Indexers
 {
     [ExcludeFromCodeCoverage]
-    public class BroadcasTheNet : BaseWebIndexer
+    public class BroadcasTheNet : IndexerBase
     {
-        // Docs at http://apidocs.broadcasthe.net/docs.php
+        public override string Id => "broadcasthenet";
+        public override string Name => "BroadcasTheNet";
+        public override string Description => "BroadcasTheNet (BTN) is an invite-only torrent tracker focused on TV shows";
+        public override string SiteLink { get; protected set; } = "https://broadcasthe.net/";
+        public override string Language => "en-US";
+        public override string Type => "private";
+
+        public override bool SupportsPagination => true;
+
+        public override TorznabCapabilities TorznabCaps => SetCapabilities();
+
+        // based on https://github.com/Prowlarr/Prowlarr/tree/develop/src/NzbDrone.Core/Indexers/Definitions/BroadcastheNet
         private readonly string APIBASE = "https://api.broadcasthe.net";
 
         // TODO: remove ConfigurationDataAPIKey class and use ConfigurationDataPasskey instead
@@ -30,36 +41,35 @@ namespace Jackett.Common.Indexers
 
         public BroadcasTheNet(IIndexerConfigurationService configService, WebClient wc, Logger l,
             IProtectionService ps, ICacheService cs)
-            : base(id: "broadcasthenet",
-                   name: "BroadcasTheNet",
-                   description: "BroadcasTheNet (BTN) is an invite-only torrent tracker focused on TV shows",
-                   link: "https://broadcasthe.net/",
-                   caps: new TorznabCapabilities
-                   {
-                       LimitsDefault = 100,
-                       LimitsMax = 1000,
-                       TvSearchParams = new List<TvSearchParam>
-                       {
-                           TvSearchParam.Q, TvSearchParam.Season, TvSearchParam.Ep
-                       }
-                   },
-                   configService: configService,
+            : base(configService: configService,
                    client: wc,
                    logger: l,
                    p: ps,
                    cacheService: cs,
                    configData: new ConfigurationDataAPIKey())
         {
-            Encoding = Encoding.UTF8;
-            Language = "en-US";
-            Type = "private";
+        }
 
-            AddCategoryMapping("SD", TorznabCatType.TVSD, "SD");
-            AddCategoryMapping("720p", TorznabCatType.TVHD, "720p");
-            AddCategoryMapping("1080p", TorznabCatType.TVHD, "1080p");
-            AddCategoryMapping("1080i", TorznabCatType.TVHD, "1080i");
-            AddCategoryMapping("2160p", TorznabCatType.TVHD, "2160p");
-            AddCategoryMapping("Portable Device", TorznabCatType.TVSD, "Portable Device");
+        private TorznabCapabilities SetCapabilities()
+        {
+            var caps = new TorznabCapabilities
+            {
+                LimitsDefault = 100,
+                LimitsMax = 1000,
+                TvSearchParams = new List<TvSearchParam>
+                {
+                    TvSearchParam.Q, TvSearchParam.Season, TvSearchParam.Ep, TvSearchParam.TvdbId
+                }
+            };
+
+            caps.Categories.AddCategoryMapping("SD", TorznabCatType.TVSD, "SD");
+            caps.Categories.AddCategoryMapping("720p", TorznabCatType.TVHD, "720p");
+            caps.Categories.AddCategoryMapping("1080p", TorznabCatType.TVHD, "1080p");
+            caps.Categories.AddCategoryMapping("1080i", TorznabCatType.TVHD, "1080i");
+            caps.Categories.AddCategoryMapping("2160p", TorznabCatType.TVHD, "2160p");
+            caps.Categories.AddCategoryMapping("Portable Device", TorznabCatType.TVSD, "Portable Device");
+
+            return caps;
         }
 
         public override async Task<IndexerConfigurationStatus> ApplyConfiguration(JToken configJson)
@@ -70,8 +80,9 @@ namespace Jackett.Common.Indexers
             try
             {
                 var results = await PerformQuery(new TorznabQuery());
-                if (results.Count() == 0)
+                if (!results.Any())
                     throw new Exception("Testing returned no results!");
+
                 IsConfigured = true;
                 SaveConfig();
             }
@@ -96,6 +107,7 @@ namespace Jackett.Common.Indexers
         protected override async Task<IEnumerable<ReleaseInfo>> PerformQuery(TorznabQuery query)
         {
             var searchString = query.GetQueryString();
+            searchString = Regex.Replace(searchString, @"(?i)\bS0*(\d+)\b", "Season $1");
             var btnResults = query.Limit;
             if (btnResults == 0)
                 btnResults = (int)TorznabCaps.LimitsDefault;
@@ -103,6 +115,8 @@ namespace Jackett.Common.Indexers
             var releases = new List<ReleaseInfo>();
             var searchParam = new Dictionary<string, string>();
 
+            if (query.IsTvdbSearch)
+                searchParam["tvdb"] = string.Format("{0}", query.TvdbID);
             searchParam["search"] = searchString.Replace(" ", "%");
 
             var parameters = new JArray
@@ -147,7 +161,7 @@ namespace Jackett.Common.Indexers
                             descriptions.Add("Origin: " + btnResult.Origin);
                         if (!string.IsNullOrWhiteSpace(btnResult.Series))
                             descriptions.Add("Youtube Trailer: <a href=\"" + btnResult.YoutubeTrailer + "\">" + btnResult.YoutubeTrailer + "</a>");
-                        var imdb = ParseUtil.GetImdbID(btnResult.ImdbID);
+                        var imdb = ParseUtil.GetImdbId(btnResult.ImdbID);
                         var link = new Uri(btnResult.DownloadURL);
                         var details = new Uri($"{SiteLink}torrents.php?id={btnResult.GroupID}&torrentid={btnResult.TorrentID}");
                         var publishDate = DateTimeUtil.UnixTimestampToDateTime(btnResult.Time);

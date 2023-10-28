@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
+using Jackett.Common.Extensions;
 using Jackett.Common.Models;
-using Jackett.Common.Models.IndexerConfig;
+using Jackett.Common.Models.IndexerConfig.Bespoke;
 using Jackett.Common.Services.Interfaces;
 using Jackett.Common.Utils;
 using Jackett.Common.Utils.Clients;
@@ -16,60 +16,92 @@ using NLog;
 namespace Jackett.Common.Indexers
 {
     [ExcludeFromCodeCoverage]
-    public class BeyondHDAPI : BaseWebIndexer
+    public class BeyondHDAPI : IndexerBase
     {
+        public override string Id => "beyond-hd-api";
+        public override string Name => "Beyond-HD (API)";
+        public override string Description => "Without BeyondHD, your HDTV is just a TV";
+        public override string SiteLink { get; protected set; } = "https://beyond-hd.me/";
+        public override string Language => "en-US";
+        public override string Type => "private";
+
+        public override bool SupportsPagination => true;
+
+        public override TorznabCapabilities TorznabCaps => SetCapabilities();
+
         private readonly string APIBASE = "https://beyond-hd.me/api/torrents/";
 
-        private new ConfigurationDataAPIKeyAndRSSKey configData
+        private new ConfigurationDataBeyondHDApi configData
         {
-            get => (ConfigurationDataAPIKeyAndRSSKey)base.configData;
+            get => (ConfigurationDataBeyondHDApi)base.configData;
             set => base.configData = value;
         }
 
         public BeyondHDAPI(IIndexerConfigurationService configService, WebClient wc, Logger l,
             IProtectionService ps, ICacheService cs)
-            : base(id: "beyond-hd-api",
-                   name: "Beyond-HD (API)",
-                   description: "Without BeyondHD, your HDTV is just a TV",
-                   link: "https://beyond-hd.me/",
-                   caps: new TorznabCapabilities
-                   {
-                       LimitsDefault = 100,
-                       LimitsMax = 100,
-                       TvSearchParams = new List<TvSearchParam>
-                       {
-                           TvSearchParam.Q, TvSearchParam.Season, TvSearchParam.Ep, TvSearchParam.ImdbId
-                       },
-                       MovieSearchParams = new List<MovieSearchParam>
-                       {
-                           MovieSearchParam.Q, MovieSearchParam.ImdbId, MovieSearchParam.TmdbId
-                       }
-                   },
-                   configService: configService,
+            : base(configService: configService,
                    client: wc,
                    logger: l,
                    p: ps,
                    cacheService: cs,
-                   configData: new ConfigurationDataAPIKeyAndRSSKey("Find the API and RSS keys under your security settings (your profile picture -> my security)"))
+                   configData: new ConfigurationDataBeyondHDApi("Find the API and RSS keys under your security settings (your profile picture -> my security)"))
         {
-            Encoding = Encoding.UTF8;
-            Language = "en-US";
-            Type = "private";
-
-            AddCategoryMapping("Movies", TorznabCatType.Movies);
-            AddCategoryMapping("TV", TorznabCatType.TV);
         }
 
+        private TorznabCapabilities SetCapabilities()
+        {
+            var caps = new TorznabCapabilities
+            {
+                LimitsDefault = 100,
+                LimitsMax = 100,
+                TvSearchParams = new List<TvSearchParam>
+                {
+                    TvSearchParam.Q, TvSearchParam.Season, TvSearchParam.Ep, TvSearchParam.ImdbId, TvSearchParam.TmdbId
+                },
+                MovieSearchParams = new List<MovieSearchParam>
+                {
+                    MovieSearchParam.Q, MovieSearchParam.ImdbId, MovieSearchParam.TmdbId
+                }
+            };
+
+            caps.Categories.AddCategoryMapping("Movies", TorznabCatType.Movies);
+            caps.Categories.AddCategoryMapping("TV", TorznabCatType.TV);
+
+            return caps;
+        }
+        protected virtual int ApiKeyLength => 32;
+        protected virtual int RSSKeyLength => 32;
         public override async Task<IndexerConfigurationStatus> ApplyConfiguration(JToken configJson)
         {
             LoadValuesFromJson(configJson);
+
+            if (configData.ApiKey.Value.IsNullOrWhiteSpace())
+            {
+                throw new Exception("Missing API Key.");
+            }
+            if (configData.ApiKey.Value.Length != ApiKeyLength)
+            {
+                throw new Exception($"Invalid API Key configured: expected length: {ApiKeyLength}, got {configData.ApiKey.Value.Length}");
+            }
+            if (configData.RSSKey.Value.IsNullOrWhiteSpace())
+            {
+                throw new Exception("Missing RSS Key.");
+            }
+            if (configData.RSSKey.Value.Length != RSSKeyLength)
+            {
+                throw new Exception($"Invalid RSS Key configured: expected length: {RSSKeyLength}, got {configData.RSSKey.Value.Length}");
+            }
 
             IsConfigured = false;
             try
             {
                 var results = await PerformQuery(new TorznabQuery());
-                if (results.Count() == 0)
+
+                if (!results.Any())
+                {
                     throw new Exception("Testing returned no results!");
+                }
+
                 IsConfigured = true;
                 SaveConfig();
             }
@@ -86,23 +118,61 @@ namespace Jackett.Common.Indexers
             var apiKey = configData.ApiKey.Value;
             var apiUrl = $"{APIBASE}{apiKey}";
 
-            Dictionary<string, string> postData = new Dictionary<string, string>
+            var postData = new Dictionary<string, string>
             {
                 { BHDParams.action, "search" },
                 { BHDParams.rsskey, configData.RSSKey.Value },
                 { BHDParams.search, query.GetQueryString() },
             };
 
-            if (query.IsTVSearch)
-                postData.Add(BHDParams.categories, "TV");
-            else if (query.IsMovieSearch)
-                postData.Add(BHDParams.categories, "Movies");
+            if (configData.FilterFreeleech.Value)
+            {
+                postData.Add(BHDParams.freeleech, "1");
+            }
 
-            var imdbId = ParseUtil.GetImdbID(query.ImdbID);
-            if (imdbId != null)
-                postData.Add(BHDParams.imdb_id, imdbId.ToString());
-            if (query.IsTmdbQuery)
-                postData.Add(BHDParams.tmdb_id, query.TmdbID.Value.ToString());
+            if (configData.FilterLimited.Value)
+            {
+                postData.Add(BHDParams.limited, "1");
+            }
+
+            if (configData.FilterRefund.Value)
+            {
+                postData.Add(BHDParams.refund, "1");
+            }
+
+            if (configData.FilterRewind.Value)
+            {
+                postData.Add(BHDParams.rewind, "1");
+            }
+
+            if (configData.SearchTypes.Values.Any())
+            {
+                postData.Add(BHDParams.types, string.Join(",", configData.SearchTypes.Values));
+            }
+
+            if (query.IsTVSearch)
+            {
+                postData.Add(BHDParams.categories, "TV");
+            }
+            else if (query.IsMovieSearch)
+            {
+                postData.Add(BHDParams.categories, "Movies");
+            }
+
+            if (query.IsImdbQuery)
+            {
+                postData.Add(BHDParams.imdb_id, query.ImdbIDShort);
+            }
+            else if (query.IsTmdbQuery)
+            {
+                postData.Add(BHDParams.tmdb_id, query.TmdbID.ToString());
+            }
+
+            if (query.Limit > 0 && query.Offset > 0)
+            {
+                var page = (query.Offset / query.Limit) + 1;
+                postData.Add("page", page.ToString());
+            }
 
             var bhdResponse = await GetBHDResponse(apiUrl, postData);
             var releaseInfos = bhdResponse.results.Select(mapToReleaseInfo);
@@ -112,12 +182,13 @@ namespace Jackett.Common.Indexers
 
         private ReleaseInfo mapToReleaseInfo(BHDResult bhdResult)
         {
-            var uri = new Uri(bhdResult.url);
             var downloadUri = new Uri(bhdResult.download_url);
+
+            var title = getTitle(bhdResult);
 
             var releaseInfo = new ReleaseInfo
             {
-                Title = bhdResult.name,
+                Title = title,
                 Seeders = bhdResult.seeders,
                 Guid = new Uri(bhdResult.url),
                 Details = new Uri(bhdResult.url),
@@ -131,7 +202,7 @@ namespace Jackett.Common.Indexers
             };
 
             if (!string.IsNullOrEmpty(bhdResult.imdb_id))
-                releaseInfo.Imdb = ParseUtil.GetImdbID(bhdResult.imdb_id);
+                releaseInfo.Imdb = ParseUtil.GetImdbId(bhdResult.imdb_id);
 
             releaseInfo.DownloadVolumeFactor = 1;
             releaseInfo.UploadVolumeFactor = 1;
@@ -148,6 +219,45 @@ namespace Jackett.Common.Indexers
             return releaseInfo;
         }
 
+        private string getTitle(BHDResult bhdResult)
+        {
+            var title = bhdResult.name.Trim();
+
+            if (!configData.AddHybridFeaturesToTitle.Value)
+            {
+                return title;
+            }
+
+            var features = new List<string>();
+
+            if (bhdResult.dv == 1)
+            {
+                features.Add("Dolby Vision");
+            }
+
+            if (bhdResult.hdr10 == 1)
+            {
+                features.Add("HDR10");
+            }
+
+            if (bhdResult.hdr10plus == 1)
+            {
+                features.Add("HDR10+");
+            }
+
+            if (bhdResult.hlg == 1)
+            {
+                features.Add("HLG");
+            }
+
+            if (features.Count > 1)
+            {
+                title += $" ({string.Join(" / ", features)})";
+            }
+
+            return title;
+        }
+
         private async Task<BHDResponse> GetBHDResponse(string apiUrl, Dictionary<string, string> postData)
         {
             var request = new WebRequest
@@ -158,8 +268,15 @@ namespace Jackett.Common.Indexers
             };
 
             var response = await webclient.GetResultAsync(request);
-
+            if (response != null && response.ContentString.StartsWith("<"))
+            {
+                // the response was not JSON, likely a HTML page for a server outage
+                logger.Warn(response.ContentString);
+                throw new Exception("The response was not JSON");
+            }
             var bhdresponse = JsonConvert.DeserializeObject<BHDResponse>(response.ContentString);
+            if (bhdresponse.status_code == 0)
+                throw new Exception(bhdresponse.status_message);
             return bhdresponse;
         }
 
@@ -226,6 +343,7 @@ namespace Jackett.Common.Indexers
         class BHDResponse
         {
             public int status_code { get; set; } // The status code of the post request. (0 = Failed and 1 = Success)
+            public string status_message { get; set; } // If status code=0 then there will be an explanation
             public int page { get; set; } // The current page of results that you're on.
             public int total_pages { get; set; } // int The total number of pages of results matching your query.
             public int total_results { get; set; } // The total number of results matching your query.
@@ -264,6 +382,12 @@ namespace Jackett.Common.Indexers
             public DateTime created_at { get; set; }
             public string url { get; set; }
             public string download_url { get; set; }
+            public int dv { get; set; }
+            public int hdr10 { get; set; }
+            [JsonProperty("hdr10+")]
+            public int hdr10plus { get; set; }
+            public int hlg { get; set; }
+            public int commentary { get; set; }
         }
     }
 }

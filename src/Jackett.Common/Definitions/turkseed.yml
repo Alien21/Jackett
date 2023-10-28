@@ -6,21 +6,25 @@ language: tr-TR
 type: private
 encoding: UTF-8
 links:
+  - https://trendfilm.net/
+legacylinks:
   - https://turkseed.com/
 
 caps:
   categorymappings:
     - {id: 46, cat: Movies/3D, desc: "3D"}
     - {id: 47, cat: Movies/UHD, desc: "4K"}
+    - {id: 74, cat: Movies/UHD, desc: "4K Plus"}
     - {id: 61, cat: PC/Mobile-Android, desc: "Android"}
     - {id: 48, cat: TV/Anime, desc: "Animasyon"}
-    - {id: 59, cat: PC, desc: "İşletim Sistemi"}
     - {id: 40, cat: TV/Documentary, desc: "Belgesel"}
     - {id: 49, cat: Movies/BluRay, desc: "Bluray"}
     - {id: 50, cat: Movies, desc: "Boxset"}
-    - {id: 4, cat: Other, desc: "Diğer"}
-    - {id: 42, cat: Movies, desc: "Dini"}
+    - {id: 70, cat: TV, desc: "DIGITAL TV"}
+    - {id: 73, cat: TV, desc: "DIGITAL TV Plus"}
     - {id: 51, cat: Movies/DVD, desc: "DVD"}
+    - {id: 42, cat: Movies, desc: "Dini"}
+    - {id: 4, cat: Other, desc: "Diğer"}
     - {id: 41, cat: Books/EBook, desc: "E-Kitap"}
     - {id: 64, cat: Books, desc: "Eğitim"}
     - {id: 55, cat: Audio/Lossless, desc: "FLAC"}
@@ -36,8 +40,7 @@ caps:
     - {id: 45, cat: TV, desc: "Yarışma - Show"}
     - {id: 44, cat: TV, desc: "Yerli Dizi"}
     - {id: 56, cat: Audio, desc: "Yerli Müzik"}
-    - {id: 63, cat: Movies, desc: "Vip Film"}
-    - {id: 62, cat: Audio, desc: "Vip Ses Dosyaları"}
+    - {id: 59, cat: PC, desc: "İşletim Sistemi"}
 
   modes:
     search: [q]
@@ -53,7 +56,7 @@ settings:
   - name: info
     type: info
     label: How to get the Cookie
-    default: "<ol><li>Login to this tracker with your browser<li>Open the <b>DevTools</b> panel by pressing <b>F12</b><li>Select the <b>Network</b> tab<li>Click on the <b>Doc</b> button (Chrome Browser) or <b>HTML</b> button (FireFox)<li>Refresh the page by pressing <b>F5</b><li>Click on the first row entry<li>Select the <b>Headers</b> tab on the Right panel<li>Find <b>'cookie:'</b> in the <b>Request Headers</b> section<li><b>Select</b> and <b>Copy</b> the whole cookie string <i>(everything after 'cookie: ')</i> and <b>Paste</b> here.</ol>"
+    default: "<ol><li>Login to this tracker with your browser</li><li>Open the <b>DevTools</b> panel by pressing <b>F12</b></li><li>Select the <b>Network</b> tab</li><li>Click on the <b>Doc</b> button (Chrome Browser) or <b>HTML</b> button (FireFox)</li><li>Refresh the page by pressing <b>F5</b></li><li>Click on the first row entry</li><li>Select the <b>Headers</b> tab on the Right panel</li><li>Find <b>'cookie:'</b> in the <b>Request Headers</b> section</li><li><b>Select</b> and <b>Copy</b> the whole cookie string <i>(everything after 'cookie: ')</i> and <b>Paste</b> here.</li></ol>"
   - name: freeleech
     type: checkbox
     label: Filter freeleech only
@@ -83,16 +86,6 @@ login:
     path: index.php
     selector: a[href*="/logout.php?logouthash="]
 
-download:
-  before:
-    path: takethanks.php
-    method: post
-    inputs:
-      torrentid: "{{ .DownloadUri.Query.id }}"
-  selectors:
-    - selector: a[href*="/download.php?id="]
-      attribute: href
-
 search:
   paths:
     - path: browse.php
@@ -100,7 +93,7 @@ search:
     do: search
     keywords: "{{ if .Query.IMDBID }}{{ .Query.IMDBID }}{{ else }}{{ .Keywords }}{{ end }}"
     # t_name, t_description, t_both, t_uploader, t_genre
-    search_type: "{{ if .Query.IMDBID }}t_genre{{ else }}t_name{{ end }}"
+    search_type: "{{ if .Query.IMDBID }}t_genre{{ else }}t_both{{ end }}"
     category: "{{ if .Categories }}{{ range .Categories }}{{.}};{{end}}{{ else }}0{{ end }}"
     include_dead_torrents: yes
     sort: "{{ .Config.sort }}"
@@ -123,20 +116,17 @@ search:
       selector: a[href*="/details.php?id="]
       attribute: href
     download:
-      selector: a[href*="/details.php?id="]
+      selector: a[href*="/download.php?id="]
       attribute: href
     poster:
       selector: img[src*="/torrents/images/"]
       attribute: src
     date:
-      selector: td:nth-child(2)
+      selector: td:nth-child(2) > div:last-child
+      # auto adjusted by site account profile
       filters:
-        - name: regexp
-          args: "(\\d{2}-\\d{2}-\\d{4} \\d{2}:\\d{2})"
-        - name: append
-          args: " +00:00" # auto adjusted by site account profile
         - name: dateparse
-          args: "02-01-2006 15:04 -07:00"
+          args: "dd-MM-yy HH:mm"
     size:
       selector: td:nth-last-child(5)
     grabs:
@@ -159,4 +149,4 @@ search:
     minimumseedtime:
       # 2 days (as seconds = 2 x 24 x 60 x 60)
       text: 172800
-# TS Special Edition v.7.5
+# TS Special Edition v.8.0

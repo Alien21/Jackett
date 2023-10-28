@@ -5,8 +5,10 @@ description: "PolishSource (PS) is a POLISH Private Torrent Tracker for MOVIES /
 language: pl-PL
 type: private
 encoding: ISO-8859-2
+requestDelay: 3
 links:
   - https://polishsource.cz/
+  - https://plsrc.cz/
 
 caps:
   categorymappings:
@@ -25,10 +27,10 @@ caps:
 
   modes:
     search: [q]
-    tv-search: [q, season, ep, imdbid]
-    movie-search: [q, imdbid]
-    music-search: [q]
-    book-search: [q]
+    tv-search: [q, season, ep, imdbid, genre]
+    movie-search: [q, imdbid, genre]
+    music-search: [q, genre]
+    book-search: [q, genre]
 
 settings:
   - name: username
@@ -39,11 +41,11 @@ settings:
     label: Password
   - name: multilang
     type: checkbox
-    label: Replace MULTI & PL by another language in release name
+    label: Replace MULTI by another language in release name
     default: false
   - name: multilanguage
     type: select
-    label: Replace MULTI & PL by this language
+    label: Replace MULTI by this language
     default: POLISH
     options:
       POLISH: POLISH
@@ -97,8 +99,8 @@ search:
     scene: 0
     # 0 all, 1 Polish, 2 non-Polish, 4 subtitled
     pl: 0
-    # subcat blank=all
-    sub: ""
+    # genre blank=all
+    sub: "{{ .Query.Genre }}"
     # title, both, nfo
     search_in: "{{ if .Query.IMDBID }}nfo{{ else }}title{{ end }}"
     sort: "{{ .Config.sort }}"
@@ -120,9 +122,9 @@ search:
       selector: a[href^="details.php?id="]
       filters:
         - name: re_replace
-          args: ["(?i)(\\.multi\\.)", ".{{ .Config.multilanguage }}."]
+          args: ["(?i)\\b(MULTI(?!.*(?:POLISH|ENGLISH|\\bPL\\b)))\\b", "{{ .Config.multilanguage }}"]
         - name: re_replace
-          args: ["(?i)(\\.pl\\.)", ".{{ .Config.multilanguage }}."]
+          args: ["(?i)\\b(pl)\\b", "POLISH"]
     title:
       text: "{{ if .Config.multilang }}{{ .Result.title_multilang }}{{ else }}{{ .Result.title_phase1 }}{{ end }}"
     details:
@@ -132,36 +134,32 @@ search:
       selector: a[href^="downloadssl.php?id="]
       attribute: href
     genre:
-      optional: true
       selector: td:nth-child(2) > small
       filters:
-        - name: prepend
-          args: "Genre: "
-        - name: append
-          args: "\n<br>"
-    language:
+        - name: replace
+          args: [" ", ", "]
+    _language:
       optional: true
       selector: img[src="pic/pl.png"]
       filters:
         - name: append
-          args: "Language: polish\n<br>"
-    subbed:
+          args: "Language: Polish\n<br>"
+    _subbed:
       optional: true
       selector: img[src="pic/napisy.png"]
       filters:
         - name: append
           args: "Subbed\n<br>"
     description:
-      text: "{{ .Result.genre }}{{ .Result.language }}{{ .Result.subbed }}"
+      text: "Genre: {{ .Result.genre }}\n<br>{{ .Result._language }}{{ .Result._subbed }}"
     imdbid:
       selector: a[href*="imdb.com/title/tt"]
     date:
       selector: td:nth-child(4)
+      # auto adjusted by site account profile
       filters:
-        - name: append
-          args: " +00:00" # auto adjusted by site account profile
         - name: dateparse
-          args: "2006-01-0215:04:05 -07:00"
+          args: "yyyy-MM-ddHH:mm:ss"
     size:
       selector: td:nth-child(5)
     grabs:

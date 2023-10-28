@@ -133,9 +133,19 @@ login:
     selector: a[href="logout.php"]
 
 download:
+  before:
+    path: thanks.php
+    method: post
+    inputs:
+      infohash: "{{ .DownloadUri.Query.id }}"
+      thanks: 1
+      rndval: "1487013827343"
   selectors:
     - selector: a[href^="download.php?id="]
       attribute: href
+      filters:
+        - name: regexp
+          args: "^(.+?)&key="
 
 search:
   paths:
@@ -202,7 +212,7 @@ search:
       selector: a[onmouseover][href^="index.php?page=torrent-details&id="]
       attribute: href
     download:
-      selector: a[href^="index.php?page=downloadcheck&id="]
+      selector: a[href^="index.php?page=downloadcheck"]
       attribute: href
     poster:
       selector: a[onmouseover][href^="index.php?page=torrent-details&id="]
@@ -212,11 +222,10 @@ search:
           args: "src=(.+?) "
     date:
       selector: td:nth-last-child(9)
+      # auto adjusted by site account profile
       filters:
-        - name: append
-          args: " +00:00" # auto adjusted by site account profile
         - name: dateparse
-          args: "02/01/2006 -07:00"
+          args: "dd/MM/yyyy"
     seeders:
       selector: td:nth-last-child(8)
     leechers:
@@ -232,15 +241,14 @@ search:
         img[alt="Silver 50% Free"]: 0.5
         img[alt="Bronze 25% Free"]: 0.75
         "*": 1
-    uploadvolumefactor_optional:
-      optional: true
+    uploadvolumefactor:
       selector: img[alt$="x Upload Multiplier"]
       attribute: alt
+      optional: true
+      default: 1
       filters:
         - name: replace
           args: ["x Upload Multiplier", ""]
-    uploadvolumefactor:
-      text: "{{ if .Result.uploadvolumefactor_optional }}{{ .Result.uploadvolumefactor_optional }}{{ else }}1{{ end }}"
     minimumratio:
       text: 0.5
 # xbtitFM 3.1.00

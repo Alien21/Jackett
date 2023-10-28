@@ -2,11 +2,13 @@ name: Publish to WinGet
 on:
   release:
     types: [released]
+permissions:
+  contents: read
 jobs:
   publish:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
-      - uses: vedantmgoyal2009/vedantmgoyal2009/winget-pkgs-automation/releaser-action@v1.0.0
+      - uses: vedantmgoyal2009/winget-releaser@v2
         with:
           identifier: Jackett.Jackett
           token: ${{ secrets.WINGET }}
