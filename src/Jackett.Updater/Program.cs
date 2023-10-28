@@ -405,8 +405,8 @@ namespace Jackett.Updater
                 "Definitions/leporno.yml",
                 "Definitions/liaorencili.yml", // renamed to cilipro
                 "Definitions/mactorrents.yml",
-                "Definitions/magnet4you.yml",
-                "Definitions/magnetdl.yml",
+                // "Definitions/magnet4you.yml",
+                // "Definitions/magnetdl.yml",
                 "Definitions/maniatorrent.yml",
                 "Definitions/manicomioshare.yml",
                 "Definitions/megabliz.yml",
